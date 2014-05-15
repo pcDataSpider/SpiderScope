@@ -1,4 +1,5 @@
 import wx
+import traceback
 
 VERSION = 0.1   # global version number
 ERROR = 1
@@ -6,16 +7,17 @@ WARNING = 2
 INFO = 3
 QUESTION = 4
 outFile = None
+printout = False
 fName = "log.txt"
 
 def write( msg ):
 	try:
-		if outFile == None:
+		if printout == True:
 			print msg
-		else:
+		if outFile != None:
 			outFile.write( str(msg) + "\n" )
 	except Exception as e:
-		print e
+		print "Error writing to log:" + str(e)
 		pass
 
 def log(name, options, mode=0):
@@ -53,5 +55,9 @@ def ask(message, mode=4):
 		return True
 	else:
 		return False
+
+def trace():
+	traceback.print_stack()
+	
 
 

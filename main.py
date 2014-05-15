@@ -1,3 +1,4 @@
+
 import sys
 import os
 import imp
@@ -31,6 +32,9 @@ pluginTree = [] # list of menu's
 TOOLPATH = "plugins"
 PROGRESS_PRECISION = 25
 LOGFILE = True
+PRINTOUT = True
+POINTDEBUG = False
+DEBUGDIALOG = False
 
 # container class. hold references to all nessesary widgets in a channel sizer.
 class ChannelWidgets():
@@ -127,23 +131,28 @@ class NewGui(GUI3.MainFrame):
 
 		# create menu items
 		rescan = wx.MenuItem( fileMenu, wx.ID_ANY, "Rescan", "Rescans for any attached devices", wx.ITEM_NORMAL )
+		sync = wx.MenuItem( fileMenu, wx.ID_ANY, "Sync", "Resyncs channel information between PC and device", wx.ITEM_NORMAL )
 		reloadtools = wx.MenuItem( fileMenu, wx.ID_ANY, "Reload Plugins", "Rescans plugin directory and loads changes", wx.ITEM_NORMAL )
 		exit = wx.MenuItem( fileMenu, wx.ID_ANY, "Exit", "Closes the application", wx.ITEM_NORMAL )
 		about = wx.MenuItem( helpMenu, wx.ID_ANY, "About", "About Box", wx.ITEM_NORMAL ) 
 
 		# append menu items
 		#fileMenu.AppendItem(rescan)
+		fileMenu.AppendItem(sync)
 		fileMenu.AppendItem(reloadtools)
 		fileMenu.AppendItem(exit)
 		helpMenu.AppendItem(about)
 		# bind items
 		self.Bind( wx.EVT_MENU, self.OnRescan, id=rescan.GetId() )
+		self.Bind( wx.EVT_MENU, self.OnSync, id=sync.GetId() )
 		self.Bind( wx.EVT_MENU, self.OnReload, id=reloadtools.GetId() )
 		self.Bind( wx.EVT_MENU, self.OnExit, id=exit.GetId() )
 		self.Bind( wx.EVT_MENU, self.OnAbout, id=about.GetId() )
 		return menuBar
 	
 		
+	def OnSync(self, event):
+		device.queryChannel()
 	def OnReload( self, event):
 		importTools(TOOLPATH)
 		self.menuBar = self.createMenubar(pluginTree)
@@ -217,6 +226,7 @@ class NewGui(GUI3.MainFrame):
 					fullPath = os.path.join(dirname, filename)
 					if not device.channels[idx].setFile(fullPath):
 						self.widgets[idx].recordBtn.SetValue(False)
+						device.channels[idx].setFile(None)
 						device.channels[idx].closeFile()
 					else:
 						device.channels[idx].openFile()
@@ -456,8 +466,11 @@ class NewGui(GUI3.MainFrame):
 	
 def testplugin(module):
 	"""returns True if module has nessesary parameters"""
-	logger.write( module.title )
-	return True # dummy
+	try:
+		logger.write( module.title )
+	except AttributeError as e:
+		return False
+	return True 
 
 def addTools(searchdir):
 	"""searches a directory and returns a list of tuples."""
@@ -504,6 +517,7 @@ def main():
 	# start logger
 	if LOGFILE:
 		logger.outFile = open( logger.fName, "w" )
+	logger.printout = PRINTOUT
 	# load all "plugin" modules. 
 	importTools(TOOLPATH)
 	# make GUI
@@ -513,13 +527,12 @@ def main():
 
 	# setup propeller object
 	device = Propeller.Device(nAnalogI, nAnalogO, nDigitals, )
+	device.propCom.POINTDEBUG = POINTDEBUG
 
 	# define message handlers
 	def versionHandler(propCom,  ver):
-		#if val is None:
-		#	PropCom.send("version",VERNUM)
-		#else:
 		logger.log("Propeller version", ver, logger.INFO)
+		device.queryChannel()
 
 
 	def setHandler(propCom,  cIdx, pVal):
@@ -570,11 +583,40 @@ def main():
 		device.queryChannel()
 		# prop state should now be setup. handle incoming data points. 
 		#propCom.register("p", pointHandler)
+	def infoHandler(propCom, chanIdx, value, extra):
+		device.channels[cIdx].setValue(value)
+		if chanIdx < nAnalogI + nAnalogO:
+			for cIdx,chan in device.analogIn.iteritems(): 
+				if not ((mask&(1<<chan.idx)>0) == chan.started): # test if this channel is correct
+					# not correct. adjust the UI
+					logger.log("Channels dont match", chan.idx, logger.INFO)
+					if chan.started:
+						chan.stop()
+					else:
+						chan.start()
+					device.queryChannel(chan.idx)
+		elif chanIdx == nAnalogI + nAnalogO:
+			pass # this would be a pin dir map. not useful right now.
+	def syncHandler(propCom, time, overflow=0):
+		propCom.onSync(time)
+
+
+	def dbgHandler(propCom, v1=None, v2=None, v3=None, v4=None, v5=None):
+		strFmt = "Debug Message:\n"
+		strFmt += str(v1) + "\n"
+		strFmt += str(v2) + "\n"
+		strFmt += str(v3) + "\n"
+		strFmt += str(v4) + "\n"
+		strFmt += str(v5) + "\n"
+		logger.message(strFmt)
 			
 
 
-	device.propCom.register("nchannels", nchannelsHandler)
+	#device.propCom.register("info", nchannelsHandler)
 	device.propCom.register("version", versionHandler)
+	if DEBUGDIALOG:
+		device.propCom.register("over", dbgHandler)
+	device.propCom.register("sync", syncHandler)
 
 	frame.createChannels(device)
 	frame.Centre(wx.BOTH)

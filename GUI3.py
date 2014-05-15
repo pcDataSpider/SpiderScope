@@ -317,19 +317,25 @@ class MainFrame ( wx.Frame ):
 
 		# create menu items
 		rescan = wx.MenuItem( fileMenu, wx.ID_ANY, "Rescan", "Rescans for any attached devices", wx.ITEM_NORMAL )
+		sync = wx.MenuItem( fileMenu, wx.ID_ANY, "Sync", "Resyncs channel information between PC and device", wx.ITEM_NORMAL )
 		exit = wx.MenuItem( fileMenu, wx.ID_ANY, "Exit", "Closes the application", wx.ITEM_NORMAL )
 		about = wx.MenuItem( helpMenu, wx.ID_ANY, "About", "About Box", wx.ITEM_NORMAL ) 
 
 		# append menu items
 		#fileMenu.AppendItem(rescan)
+		fileMenu.AppendItem(rescan)
+		fileMenu.AppendItem(sync)
 		fileMenu.AppendItem(exit)
 		helpMenu.AppendItem(about)
 		# bind items
 		self.Bind( wx.EVT_MENU, self.OnRescan, id=rescan.GetId() )
+		self.Bind( wx.EVT_MENU, self.OnSync, id=sync.GetId() )
 		self.Bind( wx.EVT_MENU, self.OnExit, id=exit.GetId() )
 		self.Bind( wx.EVT_MENU, self.OnAbout, id=about.GetId() )
 		return menuBar
 
+	def OnSync(self,event):
+		pass
 	def OnRescan(self, event):
 		pass
 	def OnExit(self, event):

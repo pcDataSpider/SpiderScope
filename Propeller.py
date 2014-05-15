@@ -8,22 +8,29 @@ import sys
 import math
 import inspect
 
+
 import channels
 import logger
 
 
 DEFAULTBAUD = 115200	# BAUD rate to communicate at
 #DEFAULTBAUD = 57600	# BAUD rate to communicate at
-DEFAULTTIMEOUT = 0.5	# Timeout for propellor to respond
+DEFAULTTIMEOUT = .5	# Timeout for propellor to respond
 DEFAULTREADSLEEP = 0.1 	# Time that the read loop sleeps for. 
 DEFAULTFLUSH = 1 	# Interval to flush channel data 
 DEFAULTOUTFILE = "test.txt"
 MAX_EID = 200
 MSG_HEAD = 2
 VERNUM = 10		# version 1.0
-PARSELOG = False
-MSGLOG = False
-#POINTLOG = False #<- look in channels.py
+EOP = "|"
+ESC = "`"
+
+IGNORECHKSUM = False #ignores bad checksums
+PARSELOG = False # turns on debugging info in the parse function.
+MSGLOG = False # turns on logging every message in the log.
+CTRLLOG = True # turns on logging of control messages and their parameters in log. does not include point messages.
+STREAMLOG = False # turns on logging every stream packet in the log. 
+#POINTLOG = False #<- look in channels.py. turns on logging every point through the AnalogI channel interface. 
 
 p_key = re.compile("""<(([^<>@:]+?))(:((([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"])),)*(([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"]))?)?>""", re.DOTALL)  # Matches Any Key!
 p_wholename = re.compile("<[^@:]*?[:]", re.DOTALL) # matches the entire name including <..|...:  (must have value field)
@@ -31,6 +38,8 @@ p_name = re.compile("<[^@:]*?[:>]", re.DOTALL) # matches only the name of the ke
 p_wholeval = re.compile(""":(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)*((#.{4})|(\$.{2})|([^<>"',#$:]*)|(['"][^'"]*['"]))?>""", re.DOTALL) # matches only the value of the key including ": ... >"
 p_val = re.compile("""(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)|(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*))>)""", re.DOTALL) # matches only a single value of the value fiel
 
+#keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
+keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg"]
 
 
 # -- Class that holds one integer point.
@@ -77,35 +86,38 @@ class Device():
 		self.digitals = channels.Digitals( self.propCom, cIdx, nDigitals, name=name)  
 		self.channels[cIdx] = self.digitals
 
-		#def flushChannels():
-		#	for key, c in self.channels.iteritems():
-		#		c.flush()
-		#t = RepeatTimer.Timer(DEFAULTFLUSH, flushChannels)
-		#t.start()
 
+	def setNAvg(self, nAvg):
+		if nAvg < 1:
+			nAvg = 1
+		self.propCom.nAvg = int(nAvg)
 
+		for x in self.analogIn:
+			idx = self.channels[x].idx
+			if self.channels[x].started and self.channels[x].value/self.propCom.nAvg<self.propCom.MIN_ADC_PERIOD and self.propCom.nAvg != 1:
+				self.setNAvg(self.channels[x].value/self.propCom.MIN_ADC_PERIOD)
+				# notify user of change
+				logger.message("Average filter is too high. \n Setting to " + str(self.propCom.nAvg) + " sample average.")
+
+		self.propCom.send("avg", self.propCom.nAvg)
+		
 	#query prop about the state of a certain channel
 	def queryChannel(self, chan=None):
-		global prop
 		if chan is None:
 			for x in self.analogIn:
 				idx = self.channels[x].idx
-				self.propCom.send("set", idx)
+				self.propCom.send("query", idx)
 			for x in self.analogOut:
 				idx = self.channels[x].idx
-				self.propCom.send("set", idx)
+				self.propCom.send("query", idx)
 			idx = self.digitals.idx
-			self.propCom.send("set", idx)
-			self.propCom.send("dir")
-			self.propCom.send("start")
+			self.propCom.send("query", idx)
 		else:
 			if chan in self.channels:
 				idx = self.channels[chan].idx
-				self.propCom.send("set", idx)
-				self.propCom.send("type", idx)
+				self.propCom.send("query", idx)
 			else:
 				logger.log("Bad Channel Querry", chan, logger.WARNING)
-			self.propCom.send("start")	
 
 
 
@@ -114,6 +126,10 @@ class Device():
 # --- The communication object. Represents methods and data related to the Propellor ---
 class PropCom(threading.Thread):
 	CLOCKPERSEC = 80000000
+	SYNCPERIOD = 80000000
+	CLOCKERROR = 20000
+	MIN_ADC_PERIOD = 8000
+	nAvg = 1
 	name = "?"
 	com = None
 	comOpen = False
@@ -136,17 +152,28 @@ class PropCom(threading.Thread):
 		threading.Thread.__init__(self)
 		self.daemon = True
 		self.setDaemon(True)
+		self.lastPkt = 0
+		self.lastTime = None
+		self.lastRTime = 0
+		self.cnt = 0
+		self.MAXTICK = (1 << 32) -1
+		self.port=None # initial port to attempt to open. overrides default search
+		self.listeners = [set(),set(),set(),set(),set(),set(),set(),set()] # length 8 list of sets
 	# starts the read loop in a seperate thread. all data is read into a buffer and parsed here. 
 	def run(self):
-		self.open()
-		buf = ""
+		self.open(self.port)
+		buf = EOP + " "
 		waiting = 0
 	
 		while self.isOpen():
 			# try to read in new info
 			try:
-				buf += self.com.read(1)
-				buf = self.parse(buf)
+				c = self.com.read(1)
+				buf += c
+				if c == EOP:
+					c = self.com.read(1)
+					buf += c
+					buf = self.parse(buf)
 			except serial.SerialException as err:
 				logger.log("SerialException on read", err,logger.WARNING)
 				self.close() # clean-up
@@ -154,14 +181,74 @@ class PropCom(threading.Thread):
 	# function that recreates the object.
 	def restart(self):
 		self.close()
+		thread.sleep(1000)
 		newSelf = PropCom(callbacks=self.callbacks)
 		newSelf.start()
 		return newSelf
 	
-	# function that creates a new unique ID. 
+	def onSync(self, tStamp):
+		if self.lastTime is None:
+			self.firstSyncTime = time.time()
+			self.firstTime = tStamp
+			self.lastTime = tStamp
+			return
+		#updates the clock counter with a new value. tests for overflow.
+		if tStamp >= self.lastTime:
+			elapsedTicks = tStamp - self.lastTime
+			print "last: "  + str(self.lastTime) + " current: " + str(tStamp)
+		else:
+			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
+			print "!!last: "  + str(self.lastTime) + " current: " + str(tStamp)
+		if elapsedTicks < self.SYNCPERIOD - self.CLOCKERROR:
+			print "@#$%^&* ( sync too soon!! not enough ticks! )"
+			print elapsedTicks
+		if elapsedTicks > self.SYNCPERIOD + self.CLOCKERROR:
+			print "@#$%^&* ( sync too late!! too many ticks! )"
+			print elapsedTicks
+	#	traceback.print_stack()
+
+		self.cnt += elapsedTicks
+		self.lastTime = tStamp
+		print str(self.curTime()) + "seconds from first sync"
+		if abs(self.curTime() - self.estTime()) > .5:
+			print "!!!!!!!!!!!!!!!!!!!!!!!!!!!! Timing difference between curTime() and estTime() " + str(self.curTime() - self.estTime())
+	def curTime(self):
+		return (self.cnt) / float(self.CLOCKPERSEC)
+	def estTime(self):
+		return time.time()-self.firstSyncTime
+
+	def realTime(self, tStamp):
+		#returns the time, in seconds since the first sync, this timestamp should be. assuming it came AFTER the last sync.
+		# this function acts like a sync. 
+		# to avoid fake rollovers, time stamps must be prossesed in a linear order.
+		#self.onSync(tStamp)
+
+		
+		if tStamp >= self.lastTime and tStamp - self.lastTime < self.MAXTICK/2: 			# this timestamp is after last sync, and no rollovers
+			elapsedTicks = tStamp - self.lastTime
+		elif self.lastTime - tStamp > self.MAXTICK/2: 	# this timestamp is new, but rolled over since last sync
+			#print "!!" + str(self.lastTime) + "->" + str(tStamp)
+			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
+		elif tStamp < self.lastTime:  						# this timestamp is slightly old, assuming it is not garbage data.
+			elapsedTicks = tStamp - self.lastTime #returns a negative elapsed time.
+		elif tStamp > self.lastTime and tStamp - self.lastTime > self.MAXTICK/2: #this timestamp is in the past, but clock recently rolled over.
+			print "!!@" + str(self.lastTime) + "->" + str(tStamp)
+			elapsedTicks = tStamp - self.MAXTICK - self.lastTime
+		else:
+			logger.log("No condition matched for 'realTime()'","Propellor.py", logger.ERROR)
+
+		rTime = (self.cnt + elapsedTicks) / float(self.CLOCKPERSEC)
+		if self.lastRTime > rTime:
+			logger.log("Went back in time??? ("+str(self.lastTStamp)+"->"+str(tStamp)+") Dif="+str(self.lastTStamp-tStamp)+"ticks, " + str(self.lastRTime-rTime)+"seconds",rTime,logger.WARNING)
+		self.lastTStamp = tStamp
+		self.lastRTime = rTime
+
+
+		return self.lastRTime
+	# function that creates a new NONZERO ID. 
 	def nextMsgID(self):
 		self.msgID = (self.msgID + 1) & 255
-		while self.msgID == 0:
+		if self.msgID == 0:
 			self.msgID = (self.msgID + 1) & 255
 		return self.msgID
 	# function that creates a new unique ID. 
@@ -172,6 +259,19 @@ class PropCom(threading.Thread):
 	# returns the name of channel idx. 
 	#def channelName(self, idx):
 	#	return self.name + " Channel " + str( idx )
+
+	# function to add a listener to a stream. appends this listener to a list.
+	def addListener(self, streamID, obj):
+		self.listeners[streamID].add(obj)
+	
+	# function to remove a listener from a stream.
+	def removeListener(self, streamID, obj):
+		try:
+			self.listeners[streamID].remove(obj)
+		except KeyError as E:
+			logger.log("No function registered in channel " + str(self.idx),  str(obj), logger.WARNING)
+			raise
+
 
 	# function to register a new callback for a certain key. appends new callback to a list. 
 	def register(self, name, func, test=None):
@@ -203,21 +303,20 @@ class PropCom(threading.Thread):
 			except Exception as e:
 				self.comOpen = False
 				logger.log("openPort Failed",e,logger.ERROR)
+			time.sleep(3)
 			self.send("version") # start the dialog
-			self.send("nchannels")
-				
 			return
 
 		if port is None:
 			self.openFirstProp(openPort) # opens the first com port
 		else:
-			openPort(port)
+			openPort(self,port)
 	def isOpen(self):
 		return self.comOpen
 	# closes COM port for this prop
 	def close(self):
 		comOpen = False
-		self.send("stop","0") # stops all channels.
+		self.send("stop",0) # stops all channels.
 		self.com.close()
 		# kill locks. 
 		for idx,t in self.locks.iteritems():
@@ -227,6 +326,9 @@ class PropCom(threading.Thread):
 
 	# send a key to the prop		
 	def send(self, key, value=None ):
+		""" sends a control packet with a message ID that corresponds to the string value 'key', with parameters specified in value.
+			key is a string that represents the message ID, or and int specifing the message ID.
+			value is either an integer, or a list of integers."""
 		
 
 		if self.com is None or self.isOpen() == False:
@@ -237,181 +339,237 @@ class PropCom(threading.Thread):
 			logger.log("send NoneType key", key, logger.WARNING)
 			return -1
 
-		msg = key
+		try:
+			msg = chr(key) + chr(self.nextMsgID())
+		except TypeError: # key is not an int. treat as string.			
+			if key not in keyTable and key :
+				logger.log("Attempting invalid control msg ID", key, logger.WARNING)
+				return -1
+			msg = chr(keyTable.index(key)) + chr(self.nextMsgID())
+
+		if CTRLLOG:
+			print msg
 		if value is not None:
-			msg += ":"
-			if isinstance( value, list ):
-				tmpval = ""
-				for i in value:
-					i=str(i)
-					try:
-						i=int(i)
-						if i>9999:
-							tmp=""
-							mask = 255
-							for n in range(4):
-								tmp+= chr( (i & mask) >> 8 * n)
-								mask = mask << 8
-							tmp+="#"
-							i = tmp[::-1]
-									
-					except ValueError:
-						i="'"+i+"'"
-					tmpval = tmpval + str(i) + ","
-					
-				value = tmpval[:-1] # crop off last ','
-
-			else:
-				value=str(value)
-				try:
-					value=int(value)
-					if value>9999:
-						tmp=""
-						mask = 255
-						for n in range(4):
-							tmp+= chr( (value & mask) >> 8 * n)
-							mask << 8
-						tmp+="#"
-						value = tmp[::-1]
-					else:
-						value = str(value)
-								
-				except ValueError:
-					value="'"+str(value)+"'"
-			msg += value
-
-
-
-	
-		msg = "<" + msg + ">"
-
-		logger.log( "sending ", msg.replace("\a","#"), logger.INFO)
+			try:
+				for v in value:
+					for n in range(4):
+						msg += chr( (v>>24-n*8)&255 )
+			except TypeError: # value is not a list. treat as int.
+				for n in range(4):
+					msg += chr( (int(value)>>24-n*8)&255 )
+		msg = msg.replace(ESC, ESC+ESC)
+		msg = msg.replace(EOP, ESC+EOP)
+		chksum = 0
+		for c in msg:
+			chksum = ((chksum<<1) | (chksum>>7)) & 255 # left-rotate
+			chksum = (chksum + ord(c)) % 256           # 8-bit addition
+		msg = msg + EOP + chr(chksum)
+		logger.log( "sending ", msg.replace("\a","@"), logger.INFO)
 		self.comlock.acquire(True)	#block until lock taken	
 		try:
 			retv = self.com.write(msg)
 		except (serial.serialutil.portNotOpenError, ValueError, serial.serialutil.SerialTimeoutException) as err:
 			logger.log("Writing to closed port", err, logger.WARNING)
+			return -1
 		except serial.SerialException as err:
 			logger.log("SerialException on write", err, logger.WARNING)
+			return -1
 		self.comlock.release()
-		return 
-	# parse all the keys in "resp". 
-	def parse(self, resp):
-		#simply start the recursion of parseKey
-		printkey = resp
-		printkey.replace('\a','~') # printable version of string with no audible bells
-		if PARSELOG:
-			sys.stdout.write("{|" + printkey + "|} \n " )
-		if MSGLOG:
-			key = p_key.search(resp)	
-			if key is not None:
-				logger.log(printkey, "|", logger.INFO)
-		val = self.parseKey(resp)
-		if PARSELOG:
-			print "    ^ Done parsing."
-		return val
-	# recursively parses the string, "keys" until there are no more keys to 
-	def parseKey(self, keys):
-		#printkey = keys
-		#printkey.replace('\a','@') # printable version of string with no audible bells
+		return 1 
 
-		key = p_key.search(keys)	
-		#prop.send("channel",prop.channel.idx)
-		if key is None:
-			#print printkey + " || " + printkey
-			#if PARSELOG:
-			#	print printkey + "  |} "
-			return keys
+		# parse all the keys in "resp". 
+	def parse(self, msgBuffer ):
+	  global DBG1
+ 	  DBG1=""
+	  #find last EOP
+	  n = 0
+	  end = 0
+	  
+	  while not end == -1:
+	    n = 0
+	    escaped = 0
+	    chksum = 0
+	    chk = 0
+	    state = 0
+	    packet = ""
+	    end = -1
+	    
+	    while end == -1:
+	      if n == len(msgBuffer):
+		end = -1
+		DBG1+="X"
+		break
+	      c = msgBuffer[n]
+	      n+=1
+	      if state == 0: # finding first EOP
+		if not escaped and c == EOP:
+		  state = 1
+		  DBG1+="{"
+		else:
+		  DBG1+="-"
+	      elif state == 1: # checksum of last packet. useless.
+		DBG1+="$("+str(ord(c))+")"
+		chksum=0
+		state = 2
+	      elif state == 2: # collect packet data
+		if not escaped and c == EOP:
+		  DBG1+="}"
+		  state = 3 #collect checksum
+		elif escaped or (not c==ESC and not c==EOP):
+		  packet+=c
+		  DBG1+=c.replace("\a","@")
+		  DBG1+="("+str(ord(c))+")"
+		  DBG1+="."
+		  chksum = ((chksum<<1) | (chksum>>7)) & 255 # left-rotate
+		  chksum = (chksum + ord(c)) & 255           # 8-bit addition
+	         
+	        if c==ESC and not escaped:
+		  DBG1+="/"
+	  	  escaped = 1
+		  chksum = ((chksum<<1) | (chksum>>7)) & 255 # left-rotate
+		  chksum = (chksum + ord(c)) &255            # 8-bit addition
+	        else:
+		  escaped = 0 
+	      elif state == 3: # storing checksum
+		chk = ord(c)
+		state = 2
+		DBG1+="#"
+		DBG1+="("+str(ord(c))+")"
+		end = n
+	    if PARSELOG:
+		    print "parsed:[[" + DBG1.replace("\n","@").replace("\r","@") + "]]"
+		
+	    if end==-1:       
+		    pass # no packets found.
+	    else:
+	      msgBuffer = msgBuffer[n-2:]
+	      if  chk != chksum and chk!=0 and not IGNORECHKSUM:
+		      if CTRLLOG:
+			      print "BAD CHECKSUM!"
+			      print "sent:"+str(chk)+" calculated:"+str(chksum)
+	      else:
+	        if len(packet) == 0:         
+	          logger.log( "Bad Packet","No bytes!", logger.WARNING)
+	        elif ord(packet[0]) & 128:
+	          self.parseStream(packet)
+	        else:
+		  if MSGLOG:
+	            logger.log("found",packet.replace("\a","@"),logger.INFO)
+	          self.parseControl(packet)
+	    
+	  return msgBuffer
+	  
+	def parseStream(self, packet):
+		''' parses a stream packet and passes parsed values to any registered stream listener objects'''
+		c = ord(packet[0])
+		streamID = (ord(packet[0])>>4) & 7
+		#print c
+		if STREAMLOG:
+			logger.log("Stream ["+str(streamID)+"]","",logger.INFO)
 
-		keystr = key.group()
-		if keystr is None:
-			#if PARSELOG:
-			#	print printkey + " |} "
-			logger.log("regex error", "matched, but no result", logger.WARNING)
-			return keys
-		if len(keystr) < 5:
-			logger.log("short msg", keys, logger.WARNING)
-			return keys
+		values = []
+		val = 0
+		valBits=32
+		byteBits=4
+		packet = chr(ord(packet[0])&15) + packet[1:]
 
-		printkey = keystr
-		printkey = printkey.replace('\a','!') # printable version of string with no audible bells  <...!name:vals>
-		if PARSELOG:
-			print printkey
-		name = p_wholename.search(keystr)
 
-		if name is None: # check if this key is a query. if so there is no ':'
-			name = keystr[1:-1]
-			val = None
-		else: # this key has a valid value field.
-			name = name.group()[1:-1]
+		n=0
 
-			val =  p_wholeval.search(keystr)
-			if val is None:
-				val = []
-			else:
-				val = val.group()[1:]
-				val = self.parseVal(val)
+		for c in packet:
+			c=ord(c)
+			while byteBits>0:
+				if valBits >= byteBits: # read in byteBits amount of bits
+					val = (val<<byteBits) | c
+					valBits -= byteBits
+					byteBits = 0
+				else: 			# read in valBits amount of bits, remaining bits left in c.
+					val = (val<<valBits) | (c>>(byteBits-valBits))
+					byteBits -= valBits
+					c = c & (~(255<<valBits))
+					valBits = 0
+				if valBits <= 0:
+					values.append(val)
+					n+=1
+					if STREAMLOG:
+						print( "   :" + str(val)),
+					val = 0
+					if n<=1:
+						valBits = 32
+					else:
+						valBits = 12
+			byteBits = 8 # prepare for next byte
+		self.callStream(streamID, values)
 
-		self.call(name,printkey ,val, )
+	  
+	def parseControl(self, packet):
+	  '''parses a control packet and calls any registered hooks for the packet's message ID type.'''
+	  curVal = 0 
+	  state = 0
+	  nameNum = -1
+	  n = 0
+	  m = 0
+	  exData = []
+	 
+	  while not n == len(packet):  
+	    
+	    c = packet[n]
+	    n+=1      
+	    if state == 0: #first byte: the message ID#
+		nameNum = ord(c)
+		state = 1
+		
+	    elif state == 1: #second byte: packet #
+		self.lastPkt = ord(c)  
+		state = 2
+	    elif state == 2: #collect packet data
+		curVal = curVal << 8
+		curVal += ord(c)
+		m += 1
+		if m==4:
+		  exData.append(curVal)
+		  curVal = 0
+		  m = 0
+          if nameNum != 13 and CTRLLOG:
+	    print("::" + str(nameNum) + "-" + str(self.lastPkt) + " = "),
+	    for v in exData:
+	      print(v),
+	    print " "
+	  self.call(nameNum, exData)
+	  return  
 
-		#if PARSELOG:
-			#sys.stdout.write(printkey + " -> ")
-		#retval = self.parseKey(keys[:key.start()] + keys[key.end():])
-		retval = self.parseKey(keys[key.end():])
-		return retval
 
-	# parses the value part of a message and returns a list of real values. numbers, or strings. 
-	def parseVal(self, valstr):
-		vList = []
-		done = False
-		while not done:
-			val = p_val.search(valstr)
-			if val is None:
-				done = True
-			else:
-				valstr = valstr[val.end():]
-				val =  val.group()[:-1]
-				#look at first letter.
-				if len(val)==5 and val[0] == "#": # binary type
-					val = val[1:]  # gives only the 4 bytes we are interested in
-					tmp = 0
-					for n in range(4): # shift and add in each character
-						tmp = (tmp<<8) + ord(val[n])
-					val = tmp
-				elif len(val)==3 and val[0] == "$": # sum type
-					val = val[1:]  # gives only the 2 bytes we are interested in
-					tmp = 0
-					for n in range(2): # shift and add in each character
-						tmp = (tmp<<8) + ord(val[n])
-					val = tmp
-						
-				elif len(val) >= 1 and (val[0] == '"' or val[0] == "'"): # string type
-					val = val[1:-1]
-				else: # number/string type
-					try:
-						vtmp = int(val) # TODO will vtmp be written to on failure?
-					except ValueError:
-						vtmp = val
-					val = vtmp
-					
-				
-				vList.append(val)
-		return vList
+
 
 	# call a function in the callback table. 
-	def call(self, name, dbugkey, val=None):
-		if name in self.callbacks:
-			for key, func in self.callbacks[name].items():
-				try:
-					if val is None or len(val)==0:
-						if func[0] is None or func[0](self):
-							func[1](self)
-					elif func[0] is None or func[0](self, *val):
-						func[1](self, *val)
-				except Exception as e:
-					logger.log( "failed call -{ " + str(dbugkey) + " }- " , str(e), logger.INFO)
+	def call(self, nameNum, val=None):
+		global DBG1
+		if nameNum<len(keyTable):
+			name = keyTable[nameNum]
+			if name in self.callbacks:
+				for key, func in self.callbacks[name].items():
+					try:
+						if val is None or len(val)==0:
+							if func[0] is None or func[0](self): #test validator
+								func[1](self)
+						elif func[0] is None or func[0](self, *val): #test validator
+							func[1](self, *val)
+					except Exception as e:
+						dbugkey = name
+						logger.log( "failed call -{ " + str(dbugkey) + " }- " , str(e), logger.INFO)
+						logger.log( " debug",DBG1,logger.INFO)
+		else:
+			logger.log("bad control ID", nameNum, logger.WARNING)
+	def callStream(self, streamID, values):
+		if streamID>8:
+			logger.log("Bad stream. StreamID too high!?", streamID, logger.ERROR)
+			raise Exception("StreamID Too High!")
 
-
+		for f in self.listeners[streamID].copy():
+			try:
+				f(self, values)
+			except Exception as e:
+				logger.log( "failed call -{ " + "stream[" + str(streamID) + "] }- ", e, logger.INFO)
 
 	# find an open port with a propellor attached to it.
 	def openFirstProp(self, openFunc):
@@ -420,6 +578,7 @@ class PropCom(threading.Thread):
 			oldVerCallback = self.callbacks["version"]
 		else:	
 			oldVerCallback = None
+		del self.callbacks["version"]
 		opened = [False]	# whether or not a valid port has been opened. 
 		retry = True		# whether or not function will retry opening
 		com = serial.Serial()
@@ -449,13 +608,16 @@ class PropCom(threading.Thread):
 						return 0
 					ID = self.register("version",verHandler)
 				
+					verStr = chr(3) + chr(1) + EOP + chr(7)
 					self.comlock.acquire(True)	#block until lock taken	
-					com.write("<version>")
+					com.write(verStr)
 					self.comlock.release()		#release comlock for others!	
 
 					time.sleep(DEFAULTTIMEOUT)
 					resp = com.read(com.inWaiting())
-					parsed = self.parse(resp)
+					if PARSELOG:
+						print resp
+					parsed = self.parse(EOP + " " + resp)
 				except (serial.serialutil.SerialException, ValueError, serial.serialutil.SerialTimeoutException) as err: 
 					logger.log("Error with port", com.port, logger.WARNING)
 					com.close()

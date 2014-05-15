@@ -120,6 +120,7 @@ class Channel():
 	def start(self):
 		"""sets this channel to started state"""
 		self.started = True
+		self.openFile()
 		self.widgets.startBtn.SetValue(True)
 		for obj in self.hooks.copy():
 			try:
@@ -130,6 +131,7 @@ class Channel():
 	def stop(self):
 		"""sets this channel to stopped state"""
 		self.started = False
+		self.closeFile()
 		self.widgets.startBtn.SetValue(False)
 		for obj in self.hooks.copy():
 			try:
@@ -148,6 +150,9 @@ class Channel():
 				pass
 		self.value = newval
 
+	def refresh(self):
+		pass
+
 	def clearTime(self):
 		"""resets the relativeTime call"""
 		self.relTimeStart = None
@@ -158,28 +163,28 @@ class Channel():
 			self.relTimeStart = seconds
 		return seconds - self.relTimeStart
 
-	def realTime(self,tStamp):
-		"""return the actual time since epoch when tStamp occured"""
-		now = time.time()
-
-		if self.lastTStamp is None:
-			self.periods = 0
-			self.lastTStamp = 0
-			self.lastRollover = now
-			self.startTime = now
-			self.startTStamp = tStamp
-			
-		# adjust tStamp for calculations
-		tStamp = tStamp - self.startTStamp
-		if tStamp < 0:
-			tStamp += (1<<32) - 1
-
-		if tStamp < self.lastTStamp:
-			self.periods += 1
-			self.lastRollover = now
-		self.lastTStamp = tStamp
-		abstime = self.startTime + self.periods*self.H + float(tStamp)/self.clockFreq
-		return abstime
+#	def realTime(self,tStamp):
+#		"""return the actual time since epoch when tStamp occured"""
+#		now = time.time()
+#
+#		if self.lastTStamp is None:
+#			self.periods = 0
+#			self.lastTStamp = 0
+#			self.lastRollover = now
+#			self.startTime = now
+#			self.startTStamp = tStamp
+#			
+#		# adjust tStamp for calculations
+#		tStamp = tStamp - self.startTStamp
+#		if tStamp < 0:
+#			tStamp += (1<<32) - 1
+#
+#		if tStamp < self.lastTStamp:
+#			self.periods += 1
+#			self.lastRollover = now
+#		self.lastTStamp = tStamp
+#		abstime = self.startTime + self.periods*self.H + float(tStamp)/self.clockFreq
+#		return abstime
 
 
 #helper function -------
@@ -241,15 +246,20 @@ class Digitals(Channel):
 				self.resetWidgets()
 			
 
-		def setHook(propCom,  cIdx, pVal):
-			bitmask = 1 << 31
-			pVal = (pVal | bitmask) ^ bitmask
+		def infoHook(propCom,  cIdx, pVal, dirs):
+		#	bitmask = 1 << 31
+		#	pVal = (pVal | bitmask) ^ bitmask
 			logger.write( pVal )
 			self.setValue(int(pVal))
+			if self.pinDirs != dirs:
+				self.pinDirs = dirs
+				self.setDir(dirs)
+				self.resetWidgets()
 
-		propCom.register("set", setHook, test=idxTest)
-		propCom.register("dir", dirHook)
-		propCom.register("d", digHook)
+	#	propCom.register("set", setHook, test=idxTest)
+	#	propCom.register("dir", dirHook)
+		propCom.register("dig", digHook)
+		propCom.register("info", infoHook, test=idxTest)
 		
 
 	def start(self):
@@ -257,24 +267,19 @@ class Digitals(Channel):
 	def stop(self):
 		pass
 	def setValue(self, newval, pinmask=None):
-		logger.write("setValue hit")
 		with self.lock:
 			if pinmask is not None: 
 				newval = ((self.value | pinmask) ^ pinmask) | (newval & pinmask)
 			if newval > 255:
 				logger.log("digital value too high!!",newval,logger.ERROR)
 				newval = 0
-			logger.write( str(self.value) + "=>" + str(newval) )
-			logger.write( newval )
-			logger.write( self.value )
 			self.oldValue = self.value
 			self.oldInVals = self.inVals
 			Channel.setValue(self, int(newval))
 			self.recordState()
-			logger.write( self.value )
-			bitmask = 1<<31
-			bitmask = bitmask | self.value
-			self.propCom.send("set",[self.idx, bitmask])
+			#bitmask = 1<<31
+			#bitmask = bitmask | self.value
+			self.propCom.send("set",[self.idx, self.value])
 			self.resetWidgets()
 		
 	def recordState(self):
@@ -284,7 +289,6 @@ class Digitals(Channel):
 		value = self.value
 		inVals = self.inVals
 		if self.outfile is not None:
-			#now = self.realTime()
 			now = self.relativeTime( time.time() )
 			#record the old values
 			strfmt = str(now)
@@ -312,9 +316,9 @@ class Digitals(Channel):
 	def setDir(self, newval):
 		''' change the pin directions for this channel '''
 		self.pinDirs = int(newval)
-		mask = 1<<31
-		mask = mask | self.pinDirs
-		self.propCom.send("dir", mask)
+		#mask = 1<<31
+		#mask = mask | self.pinDirs
+		self.propCom.send("dir", self.pinDirs)
 		self.resetWidgetDirs()
 
 	def resetWidgetDirs(self):
@@ -388,12 +392,15 @@ class AnalogOut(Channel):
 		def idxTest(propCon,  cIdx, *args):
 			return cIdx == self.idx
 
-		def setHook(propCom,  cIdx, pVal):
+		def infoHook(propCom,  cIdx, pVal, period):
 			self.setValue( int(pVal) )
-			#self.value = int(pVal)
-			#self.widgets.channelValue.SetValue(str(self.value))
+			if bool(pVal) != self.started:
+				if bool(pVal):
+					self.start()
+				else:
+					self.stop()
 
-		propCom.register("set", setHook, test=idxTest)
+		propCom.register("info", infoHook, test=idxTest)
 
 
 	def start(self):
@@ -403,6 +410,7 @@ class AnalogOut(Channel):
 		Channel.stop(self)
 		self.propCom.send("set", [self.idx, 0])
 	def setValue(self, newval):
+		" pure value from 0 - ~1000 "
 		Channel.setValue(self, int(newval))
 		if self.started:
 			self.propCom.send("set", [self.idx, self.value])
@@ -444,35 +452,86 @@ class AnalogIn(Channel):
 		self.periods = 0
 		def idxTest(propCom,  cIdx, *args):
 			return cIdx == self.idx
+		def pointIdxTest(propCom, val, *args):
+			cIdx = val >> 12
+			return cIdx == self.idx
+
 
 		
 	
-		def setHook(propCom,  cIdx, pVal):
-			self.value = int(pVal)
-			sampPsec = self.clockFreq / float(pVal)
-			self.widgets.channelValue.ChangeValue(str(sampPsec))
+		def infoHook(propCom,  cIdx, pVal, startmask):
+			if pVal == 0:
+				pVal = 1
+				logger.log("AI infohook", "Rate is infinite!", logger.ERROR)
+			sampPsec = (self.clockFreq / float(pVal))
+			self.setValue(sampPsec)			
+
+			onstate = (startmask & 1<<cIdx)
+			if bool(onstate) != self.started:
+				if onstate:
+					self.start()
+				else:
+					self.stop()
+
+		def pointHook(propCom, pVal, tStamp, dummy=0):
+			if dummy == 0:
+				raise Exception()
+			pVal = pVal & 0xFFF
+			rTime = propCom.realTime(tStamp)
+			self.add(pVal, tStamp, rTime)
 			for obj in self.hooks.copy():
 				try:
-					obj.onSet(self, propCom, pVal, sampPsec)
+					if propCom.POINTDEBUG:
+						obj.onPoint(self, propCom, pVal, tStamp, rTime, "SlowFreq")
+					else:
+						obj.onPoint(self,propCom, pVal, tStamp, rTime)
 				except Exception as e:
-					pass
-			
-		def pointHook(propCom,  cIdx, pVal, tStamp):
-			try:
-				rTime = self.realTime(tStamp)
-				self.add(pVal,tStamp,rTime)
+					logger.log("Error with pointHook (channels.py)", e, logger.WARNING)
+
+		def streamListener(propCom, values):
+			rate = values[0]
+			tStamp = values[1]
+			rTime = propCom.realTime(tStamp)
+
+			points = []
+			n = 0
+			for v in values[2:]:
+				curTStamp =  tStamp + rate*n
+				curRTime = rTime + (float(rate)/propCom.CLOCKPERSEC)*n
+				if curTStamp > 1<<32:
+					curTStamp -= (1<<32)
+				point = (v, curTStamp, curRTime )
+				points.append( point )
+				self.add(*point)
 				for obj in self.hooks.copy():
 					try:
-						obj.onPoint(self, propCom, pVal, tStamp, rTime)
+						if propCom.POINTDEBUG:
+							obj.onPoint(self, propCom, *point, debugObj="HighFreq - " + str(rate))
+						else:
+							obj.onPoint(self, propCom, *point)
 					except Exception as e:
-						logger.log("Error with pointHook (channels.py)", e, logger.WARNING)
-			except ValueError as e:
-				logger.log("Incorrect values to 'p'", e, logger.WARNING)
-			except TypeError as e:
-				logger.log("Incorrect types to 'p'", e, logger.WARNING)
+						logger.log("Error with streamListener (channels.py)", e, logger.WARNING)
+				n+=1
 
-		propCom.register("set", setHook, test=idxTest)
-		propCom.register("p", pointHook, test=idxTest)
+		
+			
+	#	def pointHook(propCom,  cIdx, pVal, tStamp):
+	#		try:
+	#			rTime = self.realTime(tStamp)
+	#			self.add(pVal,tStamp,rTime)
+	#			for obj in self.hooks.copy():
+	#				try:
+	#					obj.onPoint(self, propCom, pVal, tStamp, rTime)
+	#				except Exception as e:
+	#					logger.log("Error with pointHook (channels.py)", e, logger.WARNING)
+	#		except ValueError as e:
+	#			logger.log("Incorrect values to 'p'", e, logger.WARNING)
+	#		except TypeError as e:
+	#			logger.log("Incorrect types to 'p'", e, logger.WARNING)
+
+		propCom.register("info", infoHook, test=idxTest)
+		propCom.register("point", pointHook, test=pointIdxTest)
+		propCom.addListener(self.idx,streamListener)
 
 	def setFile(self, fname):
 		self.flush()
@@ -499,10 +558,26 @@ class AnalogIn(Channel):
 
 	def start(self):
 		Channel.start(self)
+		self.testAverage()
 		self.propCom.send("start",1<<self.idx)
+	def refresh(self):
+		Channel.refresh(self)
+		self.propCom.send("set",[self.idx, self.value])
+		self.propCom.send("set",[self.idx])
+
+	def testAverage(self):
+		if self.started and self.value/self.propCom.nAvg<self.propCom.MIN_ADC_PERIOD and self.propCom.nAvg != 1:
+			# notify user of change
+			self.propCom.nAvg = int(self.value/self.propCom.MIN_ADC_PERIOD)
+			logger.message("Average filter is too high. \n Setting to " + str(self.propCom.nAvg) + " sample average.")
+			self.propCom.send("avg",self.propCom.nAvg)
+
 
 	def setValue(self, newval):
+		"""sets a new sample rate, specified in samples per second, for this channel"""
 		Channel.setValue(self, int( self.clockFreq / float(newval) ))
+
+		self.testAverage()
 		
 		self.propCom.send("set",[self.idx, self.value])
 		self.widgets.channelValue.SetValue(str(newval))

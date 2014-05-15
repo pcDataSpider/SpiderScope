@@ -7,6 +7,9 @@ import threading
 import os
 
 
+colorTable = [ "blue", "red", "green", "yellow", "purple", "black" ]
+
+
 class GetNumBox(wx.Dialog):
 	def __init__(self, parent, xRange = None, prompt="Number", title="Num", text=""):
 		wx.Dialog.__init__(self, parent, id=wx.ID_ANY, title = "Enter A Number")
@@ -166,13 +169,14 @@ class GraphInfoBox(wx.Dialog):
 
 	
 class GraphFrame(wx.Frame):
-	def __init__(self, parent, xRange=None, yRange=None, xSize=None, ySize=None, nPoints=None, header=None,  title="Graph", xlabel="Seconds", ylabel="Value", showPoints=False):
+	def __init__(self, parent, xRange=None, yRange=None, xSize=None, ySize=None, nPoints=None, header=None,  title="Graph", xlabel="Seconds", ylabel="Value", showPoints=False, POINTDEBUG=False):
 		self.max_X = xSize
 		self.max_Y = ySize
 		self.xRange = xRange
 		self.yRange = yRange
 		self.nPoints = nPoints
 		self.showPoints = showPoints
+		self.POINTDEBUG = POINTDEBUG
 
 
 
@@ -250,34 +254,42 @@ class GraphFrame(wx.Frame):
 	
 
 	def updateData(self):
+
 		lines = []
 		if not self.data:
 			lines.append( wx.lib.plot.PolyLine([self.lastpoint], colour="black", width=1) )
 		else:
+			n = 0
 			for idx in self.data:
+				thisColor = colorTable[n]
+				n += 1
 				if self.showPoints:
-					lines.append( wx.lib.plot.PolyMarker(self.data[idx], colour="black", width=2, fillstyle=wx.SOLID, fillcolour="black", size=1, marker="circle") )
-					lines.append( wx.lib.plot.PolyMarker(self.displayData[idx], colour="black", width=2, fillstyle=wx.SOLID, fillcolour="black", size=1, marker="circle") )
+					if self.nPoints > 0:
+						lines.append( wx.lib.plot.PolyMarker(self.displayData[idx], colour=thisColor, width=2, fillstyle=wx.SOLID, fillcolour=thisColor, size=1, marker="circle") )
+					else:
+						lines.append( wx.lib.plot.PolyMarker(self.data[idx], colour=thisColor, width=2, fillstyle=wx.SOLID, fillcolour=thisColor, size=1, marker="circle") )
 				if self.nPoints > 0:
-					lines.append( wx.lib.plot.PolyLine(self.displayData[idx], colour="red", width=1) )
+					lines.append( wx.lib.plot.PolyLine(self.displayData[idx], colour=thisColor, legend=str(idx), width=1) )
 				else:
-					lines.append( wx.lib.plot.PolyLine(self.data[idx], colour="blue", width=1) )
+					lines.append( wx.lib.plot.PolyLine(self.data[idx], colour=thisColor, legend=str(idx), width=1) )
 				#lines.append( wx.lib.plot.PolyLine(self.dataQueue, colour="green", width=1) )
 		pg = wx.lib.plot.PlotGraphics(lines, self.title, self.xlabel, self.ylabel)
 		if self.max_X is not None:
 			self.xRange = ( self.lastpoint[0] - self.max_X/2.0, self.lastpoint[0] + self.max_X/2.0 )
 		if self.max_Y is not None:
 			self.yRange = ( self.lastpoint[1] - self.max_Y/2.0, self.lastpoint[1] + self.max_Y/2.0 )
-
+		
+		if len( self.data ) > 1 :
+			self.plot.SetEnableLegend(True)
 		self.plot.Draw(pg, self.xRange, self.yRange)
 		self.pending = False
 		
 	
-	def addPoint(self, x, y, idx):
+	def addPoint(self, x, y, idx, debugObj=None):
 		if idx not in self.data:
 			self.data[idx] = []
 			self.displayData[idx] = []
-		self.data[idx].append((x,y))
+		self.data[idx].append((x,y,debugObj))
 		self.displayData[idx].append((x,y))
 		#if self.dataQueue.full():
 		#	self.dataQueue.get()
@@ -323,6 +335,8 @@ class GraphFrame(wx.Frame):
 				for idx in self.data:
 					outFile.write(", X" + str(idx) )
 					outFile.write(", Y" + str(idx) )
+					if self.POINTDEBUG:
+						outFile.write(", DEBUG" + str(idx) )
 				outFile.write( "\n" )
 				# write data
 				nData = 0
@@ -333,6 +347,8 @@ class GraphFrame(wx.Frame):
 					for idx in self.data:
 						try:
 							strfmt = ",{0:.5f},{1}".format(self.data[idx][n][0], self.data[idx][n][1])
+							if self.POINTDEBUG:
+								strfmt += "," + str(self.data[idx][n][2])
 							outFile.write(strfmt)
 						except IndexError:
 							pass
