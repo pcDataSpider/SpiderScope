@@ -9,6 +9,9 @@ import RepeatTimer
 
 import logger
 
+# set log level to disable warnings caused by this wxPython bug: http://trac.wxwidgets.org/ticket/15360
+wx.Log.SetLogLevel(0)
+
 # imports for plugins (for compiling)
 
 import Queue

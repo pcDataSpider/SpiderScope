@@ -1,9 +1,0 @@
-(W)Could not load plugin directory.: [Error 3] The system cannot find the path specified: 'd:\\Code\\pcDataSpider\\spiderscope\\plugins/*.*'
-(W)Could not load tools:: local variable 'files' referenced before assignment
-Creating Menubar:
-[]
-Building Menus
-(I)Testing port: COM3
-(I)Testing port: COM3
-(I)Frame closed: 
-(W)send on bad port: stop
