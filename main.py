@@ -12,9 +12,9 @@ import logger
 # imports for plugins (for compiling)
 
 import Queue
-import wx.lib.plot
+#import wx.lib.plot
 import wx.lib.scrolledpanel as scrolled
-import graph
+#import graph
 import pickle
 
 
@@ -30,6 +30,7 @@ pluginTree = [] # list of menu's
 
 TOOLPATH = "plugins"
 PROGRESS_PRECISION = 25
+LOGCONSOLE = True
 LOGFILE = True
 
 # container class. hold references to all nessesary widgets in a channel sizer.
@@ -489,7 +490,11 @@ def importTools(relPath):
 
 	cwd = os.getcwd()
 	toolDirPath = os.path.join(cwd, relPath)
-	files = os.listdir( toolDirPath )
+	try:
+		files = os.listdir( toolDirPath )
+	except Exception as e:
+		logger.log("Could not load plugin directory.", e, logger.WARNING)
+		return
 	for f in files:
 		fullpath = os.path.join(toolDirPath, f)
 		if os.path.isdir( fullpath ):
@@ -504,8 +509,13 @@ def main():
 	# start logger
 	if LOGFILE:
 		logger.outFile = open( logger.fName, "w" )
+	if LOGCONSOLE:
+		logger.console = True
 	# load all "plugin" modules. 
-	importTools(TOOLPATH)
+	try:
+		importTools(TOOLPATH)
+	except Exception as e:
+		logger.log("Could not load tools:", e, logger.WARNING)
 	# make GUI
 	app = wx.PySimpleApp()
 	frame = NewGui(None)

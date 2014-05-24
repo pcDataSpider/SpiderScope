@@ -5,14 +5,16 @@ ERROR = 1
 WARNING = 2
 INFO = 3
 QUESTION = 4
-outFile = None
+
+console = False # set True to force logging to console
+outFile = None # If not None, logger will write to this file
 fName = "log.txt"
 
 def write( msg ):
 	try:
-		if outFile == None:
+		if outFile is None or console:
 			print msg
-		else:
+		if outFile is not None:
 			outFile.write( str(msg) + "\n" )
 	except Exception as e:
 		print e
