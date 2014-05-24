@@ -13,17 +13,15 @@ import logger
 
 
 DEFAULTBAUD = 115200	# BAUD rate to communicate at
-#DEFAULTBAUD = 57600	# BAUD rate to communicate at
-DEFAULTTIMEOUT = 0.5	# Timeout for propellor to respond
+DEFAULTTIMEOUT = 5.5	# Timeout for propellor to respond
 DEFAULTREADSLEEP = 0.1 	# Time that the read loop sleeps for. 
 DEFAULTFLUSH = 1 	# Interval to flush channel data 
 DEFAULTOUTFILE = "test.txt"
 MAX_EID = 200
 MSG_HEAD = 2
 VERNUM = 10		# version 1.0
-PARSELOG = False
-MSGLOG = False
-#POINTLOG = False #<- look in channels.py
+PARSELOG = True #enable logging the entire message parsing algorithm. handy to see COM port buffer state.
+MSGLOG = True #enable logging every message. 
 
 p_key = re.compile("""<(([^<>@:]+?))(:((([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"])),)*(([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"]))?)?>""", re.DOTALL)  # Matches Any Key!
 p_wholename = re.compile("<[^@:]*?[:]", re.DOTALL) # matches the entire name including <..|...:  (must have value field)
