@@ -214,7 +214,6 @@ class PropCom(threading.Thread):
 	# Should be called on every *sync* packet. 
 	def onSync(self, tStamp):
 		if self.lastTime is None:
-			self.firstSyncTime = time.time()
 			self.firstTime = tStamp
 			self.lastTime = tStamp
 			logger.write( "first: "  + str(self.lastTime) )
@@ -237,7 +236,7 @@ class PropCom(threading.Thread):
 
 		self.cnt += elapsedTicks
 		self.lastTime = tStamp
-		logger.write( str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
+		logger.write( str(self.cnt) + "ticks. " + str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
 		if abs(self.curTime() - self.estTime()) > .5:
 			logger.write("!!!!!!!!!!!!!!!!!!!!!!!!!!! Timing difference between curTime() and estTime() " + str(self.curTime() - self.estTime()))
 	# function PropCom.curTime() return Float the current time in seconds since the first sync.
@@ -248,14 +247,8 @@ class PropCom(threading.Thread):
 		return time.time()-self.firstSyncTime
 
 	# function PropCom.realTime(Int tStamp) return Float The time in seconds since the first sync this timestamp corresponds to.
-	# tStamp = the timestamp to be converted. Must be within the past 1/2 clock period. ( ~30 seconds) to avoid clock overflow errors.
+	# tStamp = the timestamp to be converted. Must be within +- 1/2 clock cycle since the last sync to avoid errors
 	def realTime(self, tStamp):
-		#returns the time, in seconds since the first sync, this timestamp should be. assuming it came AFTER the last sync.
-		# this function acts like a sync. 
-		# to avoid fake rollovers, time stamps must be prossesed in a linear order.
-		#self.onSync(tStamp)
-
-		
 		if tStamp >= self.lastTime and tStamp - self.lastTime < self.MAXTICK/2: 			# this timestamp is after last sync, and no rollovers
 			elapsedTicks = tStamp - self.lastTime
 		elif self.lastTime - tStamp > self.MAXTICK/2: 	# this timestamp is new, but rolled over since last sync
@@ -268,6 +261,7 @@ class PropCom(threading.Thread):
 			elapsedTicks = tStamp - self.MAXTICK - self.lastTime
 		else:
 			logger.log("No condition matched for 'realTime()'","Propellor.py", logger.ERROR)
+			elapsedTicks = 0
 
 		rTime = (self.cnt + elapsedTicks) / float(self.CLOCKPERSEC)
 		if self.lastRTime > rTime:
@@ -342,6 +336,7 @@ class PropCom(threading.Thread):
 				self.com.open()
 				logger.log("Opened port",self.com.port,logger.INFO)
 				self.comOpen = True
+				self.firstSyncTime = time.time() #sync packets should start accumulating as soon as we open the port
 			except Exception as e:
 				self.comOpen = False
 				logger.log("openPort Failed",e,logger.ERROR)
