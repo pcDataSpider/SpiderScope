@@ -1,8 +1,14 @@
 import threading
 import time
 
- # --- Timer class that repeats after timer finishes.  ---
+# class Thread.Timer A timer that repeats after the timer expires.
 class Timer(threading.Thread):
+	#constructor Timer(Float interval, Bool check, Function callable, [Value] args, {String:Value} kwargs) Construct a new repeateing Timer with the given parameters
+	# interval = Time in seconds between triggers
+	# check = 
+	# callable = Function to be called when the timer expires
+	# args = arguments passed to the callable function
+	# kwargs = dictionary of keyword arguments passed to the callable function
     def __init__(self, interval, check, callable, *args, **kwargs):
         threading.Thread.__init__(self)
         self.interval = interval
@@ -30,6 +36,7 @@ class Timer(threading.Thread):
             self.t.start()
             self.t.join()
 
+    #function Timer.cancel() Cancels the timer and stops any pending actions.
     def cancel(self):
         self.event.clear()
 	if self.t is not None:
