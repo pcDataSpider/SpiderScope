@@ -1,7 +1,7 @@
 import serial
 import serial.tools.list_ports
 import time
-import re
+#import re
 import threading
 import RepeatTimer
 import sys
@@ -26,17 +26,18 @@ EOP = "|"
 ESC = "`"
 
 IGNORECHKSUM = False #ignores bad checksums
+BUFFERLOG = True # turns on logging buffer contents on packet parsing
 PARSELOG = False # turns on debugging info in the parse function.
-MSGLOG = False # turns on logging every message in the log.
+MSGLOG = True # turns on logging every message in the log.
 CTRLLOG = True # turns on logging of control messages and their parameters in log. does not include point messages.
 STREAMLOG = False # turns on logging every stream packet in the log. 
 #POINTLOG = False #<- look in channels.py. turns on logging every point through the AnalogI channel interface. 
 
-p_key = re.compile("""<(([^<>@:]+?))(:((([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"])),)*(([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"]))?)?>""", re.DOTALL)  # Matches Any Key!
-p_wholename = re.compile("<[^@:]*?[:]", re.DOTALL) # matches the entire name including <..|...:  (must have value field)
-p_name = re.compile("<[^@:]*?[:>]", re.DOTALL) # matches only the name of the key including "< ... :" (no echo) 
-p_wholeval = re.compile(""":(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)*((#.{4})|(\$.{2})|([^<>"',#$:]*)|(['"][^'"]*['"]))?>""", re.DOTALL) # matches only the value of the key including ": ... >"
-p_val = re.compile("""(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)|(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*))>)""", re.DOTALL) # matches only a single value of the value fiel
+#p_key = re.compile("""<(([^<>@:]+?))(:((([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"])),)*(([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"]))?)?>""", re.DOTALL)  # Matches Any Key!
+#p_wholename = re.compile("<[^@:]*?[:]", re.DOTALL) # matches the entire name including <..|...:  (must have value field)
+#p_name = re.compile("<[^@:]*?[:>]", re.DOTALL) # matches only the name of the key including "< ... :" (no echo) 
+#p_wholeval = re.compile(""":(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)*((#.{4})|(\$.{2})|([^<>"',#$:]*)|(['"][^'"]*['"]))?>""", re.DOTALL) # matches only the value of the key including ": ... >"
+#p_val = re.compile("""(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)|(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*))>)""", re.DOTALL) # matches only a single value of the value fiel
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
 keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg"]
@@ -173,7 +174,11 @@ class PropCom(threading.Thread):
 				if c == EOP:
 					c = self.com.read(1)
 					buf += c
+					if BUFFERLOG:
+						prebuf = buf
 					buf = self.parse(buf)
+					if BUFFERLOG and buf != prebuf:
+						print prebuf + " Parsed to " + buf
 			except serial.SerialException as err:
 				logger.log("SerialException on read", err,logger.WARNING)
 				self.close() # clean-up
@@ -191,27 +196,29 @@ class PropCom(threading.Thread):
 			self.firstSyncTime = time.time()
 			self.firstTime = tStamp
 			self.lastTime = tStamp
+			logger.write( "first: "  + str(self.lastTime) )
 			return
 		#updates the clock counter with a new value. tests for overflow.
 		if tStamp >= self.lastTime:
 			elapsedTicks = tStamp - self.lastTime
-			print "last: "  + str(self.lastTime) + " current: " + str(tStamp)
+			logger.write( "last: "  + str(self.lastTime) + " current: " + str(tStamp))
 		else:
 			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
-			print "!!last: "  + str(self.lastTime) + " current: " + str(tStamp)
+			logger.write( "!!last: "  + str(self.lastTime) + " current: " + str(tStamp))
+
 		if elapsedTicks < self.SYNCPERIOD - self.CLOCKERROR:
-			print "@#$%^&* ( sync too soon!! not enough ticks! )"
-			print elapsedTicks
+			logger.write( "@#$%^&* ( sync too soon!! not enough ticks! )")
+			logger.write( elapsedTicks)
 		if elapsedTicks > self.SYNCPERIOD + self.CLOCKERROR:
-			print "@#$%^&* ( sync too late!! too many ticks! )"
-			print elapsedTicks
+			logger.write( "@#$%^&* ( sync too late!! too many ticks! )")
+			logger.write( elapsedTicks)
 	#	traceback.print_stack()
 
 		self.cnt += elapsedTicks
 		self.lastTime = tStamp
-		print str(self.curTime()) + "seconds from first sync"
+		logger.write( str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
 		if abs(self.curTime() - self.estTime()) > .5:
-			print "!!!!!!!!!!!!!!!!!!!!!!!!!!!! Timing difference between curTime() and estTime() " + str(self.curTime() - self.estTime())
+			logger.write("!!!!!!!!!!!!!!!!!!!!!!!!!!! Timing difference between curTime() and estTime() " + str(self.curTime() - self.estTime()))
 	def curTime(self):
 		return (self.cnt) / float(self.CLOCKPERSEC)
 	def estTime(self):
