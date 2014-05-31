@@ -14,4 +14,9 @@ Upcoming in release v1.0 (requires firmware update):
 * up to 2000 samples per second across all channels (10x speed up)
 * average up to 10 values per sample for an effective sampling rate of 20khz
 
+Installation
+========
+See the [wiki article](https://github.com/pcDataSpider/SpiderScope/wiki/installation) For isntallation instructions
+
+
 For more information, look at our [wiki](https://github.com/pcDataSpider/SpiderScope/wiki) or read the [user manual](http://pcdataspider.com/assets/datasheets/SpiderScope-Manual.pdf)
