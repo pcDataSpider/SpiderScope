@@ -8,6 +8,8 @@ WARNING = 2
 INFO = 3
 QUESTION = 4
 
+LOGSYNC = True
+
 outFile = None
 printout = False
 fName = "log.txt"
