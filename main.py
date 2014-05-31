@@ -10,12 +10,15 @@ import RepeatTimer
 
 import logger
 
+#Disable wxPython logging as a workaround to this bug: http://trac.wxwidgets.org/ticket/15360
+wx.Log.SetLogLevel(0)
+
 # imports for plugins (for compiling)
 
 import Queue
-import wx.lib.plot
+#import wx.lib.plot
 import wx.lib.scrolledpanel as scrolled
-import graph
+#import graph
 import pickle
 
 
@@ -31,16 +34,18 @@ pluginTree = [] # list of menu's
 
 TOOLPATH = "plugins"
 PROGRESS_PRECISION = 25
+LOGCONSOLE = True
 LOGFILE = True
 PRINTOUT = True
 POINTDEBUG = False
 DEBUGDIALOG = False
 
-# container class. hold references to all nessesary widgets in a channel sizer.
+#class ChannelWidgets A container for widgets relating to a channel
 class ChannelWidgets():
 	name = "name"
 	panel = None
 
+#class AnalogInWidgets A container for widgets relating to an analog input channel
 class AnalogInWidgets (ChannelWidgets):
 	name = "name"
 	panel = None
@@ -53,6 +58,7 @@ class AnalogInWidgets (ChannelWidgets):
 	progressTimers = []
 	runForTimer = None
 
+#class AnalogOutWidgets A container for widgets relating to an analog output channel
 class AnalogOutWidgets(ChannelWidgets):
 	channelValue = None
 	startBtn = None
@@ -63,6 +69,7 @@ class AnalogOutWidgets(ChannelWidgets):
 	progressTimers = []
 	runForTimer = None
 
+#class DigitalWidgets A container for widgets relating to a digital channel
 class DigitalWidgets(ChannelWidgets):
 	lights = None
 	switches = None
@@ -502,7 +509,11 @@ def importTools(relPath):
 
 	cwd = os.getcwd()
 	toolDirPath = os.path.join(cwd, relPath)
-	files = os.listdir( toolDirPath )
+	try:
+		files = os.listdir( toolDirPath )
+	except Exception as e:
+		logger.log("Unable to open plugin directory", e, logger.WARNING)
+		return
 	for f in files:
 		fullpath = os.path.join(toolDirPath, f)
 		if os.path.isdir( fullpath ):
@@ -519,7 +530,10 @@ def main():
 		logger.outFile = open( logger.fName, "w" )
 	logger.printout = PRINTOUT
 	# load all "plugin" modules. 
-	importTools(TOOLPATH)
+	try:
+		importTools(TOOLPATH)
+	except Exception as e:
+		logger.log("Unable to import tools:", e, logger.WARNING)
 	# make GUI
 	app = wx.PySimpleApp()
 	frame = NewGui(None)
