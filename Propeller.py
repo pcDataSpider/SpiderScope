@@ -216,29 +216,34 @@ class PropCom(threading.Thread):
 		if self.lastTime is None:
 			self.firstTime = tStamp
 			self.lastTime = tStamp
-			logger.write( "first: "  + str(self.lastTime) )
-			return
+			if logger.LOGSYNC:
+				logger.write( "first: "  + str(self.lastTime) )
+			return 
+			
 		#updates the clock counter with a new value. tests for overflow.
 		if tStamp >= self.lastTime:
 			elapsedTicks = tStamp - self.lastTime
-			logger.write( "last: "  + str(self.lastTime) + " current: " + str(tStamp))
+			if logger.LOGSYNC:
+				logger.log( "sync", str(self.lastTime) + " -> " + str(tStamp), logger.INFO)
 		else:
 			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
-			logger.write( "!!last: "  + str(self.lastTime) + " current: " + str(tStamp))
+			if logger.LOGSYNC:
+				logger.log( "sync (rollover)", str(self.lastTime) + " -> " + str(tStamp), logger.INFO)
 
-		if elapsedTicks < self.SYNCPERIOD - self.CLOCKERROR:
-			logger.write( "@#$%^&* ( sync too soon!! not enough ticks! )")
-			logger.write( elapsedTicks)
-		if elapsedTicks > self.SYNCPERIOD + self.CLOCKERROR:
-			logger.write( "@#$%^&* ( sync too late!! too many ticks! )")
-			logger.write( elapsedTicks)
-	#	traceback.print_stack()
+		if logger.LOGSYNC:
+			if elapsedTicks < self.SYNCPERIOD - self.CLOCKERROR:
+				logger.log( "sync too soon! not enough ticks!", elapsedTicks, logger.WARNING)
+			if elapsedTicks > self.SYNCPERIOD + self.CLOCKERROR:
+				logger.write( "sync too late! too many ticks!", elapsedTicks, logger.WARNING)
 
 		self.cnt += elapsedTicks
 		self.lastTime = tStamp
-		logger.write( str(self.cnt) + "ticks. " + str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
-		if abs(self.curTime() - self.estTime()) > .5:
-			logger.write("!!!!!!!!!!!!!!!!!!!!!!!!!!! Timing difference between curTime() and estTime() " + str(self.curTime() - self.estTime()))
+		if logger.LOGSYNC:
+			logger.write( str(self.cnt) + "ticks. " + str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
+		if abs(self.curTime() - self.estTime()) > .5: #Adjust if time has strayed
+			logger.log("Significant Timing difference between curTime() and estTime()" , str(self.curTime() - self.estTime()),logger.ERROR)
+			self.cnt -= (self.curTime() - self.estTime())*self.CLOCKPERSEC
+
 	# function PropCom.curTime() return Float the current time in seconds since the first sync.
 	def curTime(self):
 		return (self.cnt) / float(self.CLOCKPERSEC)
