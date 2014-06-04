@@ -8,19 +8,40 @@ WARNING = 2
 INFO = 3
 QUESTION = 4
 
-LOGSYNC = True
-
+options = dict()
 outFile = None
-printout = False
-fName = "log.txt"
+
+#function logger.setOptions( Dict ) Sets the global option dicsionary to the given Dict.
+def setOptions( o ):
+	global options
+	options = o
+	# open the outfile
+	try:
+		fname = options["file"]
+		outFile = open(fname, "w")
+	except KeyError:
+		outFile = None
+	except OSError:
+		outFile = None
+
+# function logger.close() Close any open files
+def close():
+	if outFile is not None:
+		outFile.close()
 
 #function logger.write( String ) Write the string int the log as-is
-def write( msg ):
+def write( msg ,sameLine=False):
 	try:
-		if printout == True:
-			print msg
+		if options["console"]:
+			if sameLine:
+				print(msg),
+			else:
+				print msg
 		if outFile != None:
-			outFile.write( str(msg) + "\n" )
+			if sameLine:
+				outFile.write( str(msg) )
+			else:
+				outFile.write( str(msg) + "\n" )
 	except Exception as e:
 		print "Error writing to log:" + str(e)
 		pass

@@ -8,6 +8,7 @@ import Propeller
 import threading
 import RepeatTimer
 
+import config
 import logger
 
 #Disable wxPython logging as a workaround to this bug: http://trac.wxwidgets.org/ticket/15360
@@ -32,13 +33,13 @@ frame = None
 plugins = [] # list of loaded plugin modules
 pluginTree = [] # list of menu's
 
-TOOLPATH = "plugins"
-PROGRESS_PRECISION = 25
-LOGCONSOLE = True
-LOGFILE = True
-PRINTOUT = True
-POINTDEBUG = False
-DEBUGDIALOG = False
+#TOOLPATH = "plugins"
+#PROGRESS_PRECISION = 25
+#LOGCONSOLE = True
+#LOGFILE = True
+#PRINTOUT = True
+#POINTDEBUG = False
+#DEBUGDIALOG = False
 
 #class ChannelWidgets A container for widgets relating to a channel
 class ChannelWidgets():
@@ -525,13 +526,12 @@ def importTools(relPath):
 def main():
 	global device
 	global frame
-	# start logger
-	if LOGFILE:
-		logger.outFile = open( logger.fName, "w" )
-	logger.printout = PRINTOUT
+	# put global options in the logger, since everything has access to it.
+	logger.setOptions(config.options)
+
 	# load all "plugin" modules. 
 	try:
-		importTools(TOOLPATH)
+		importTools(logger.options["plugin_dir"])
 	except Exception as e:
 		logger.log("Unable to import tools:", e, logger.WARNING)
 	# make GUI
@@ -541,7 +541,6 @@ def main():
 
 	# setup propeller object
 	device = Propeller.Device(nAnalogI, nAnalogO, nDigitals, )
-	device.propCom.POINTDEBUG = POINTDEBUG
 
 	# define message handlers
 	def versionHandler(propCom,  ver):
@@ -628,7 +627,7 @@ def main():
 
 	#device.propCom.register("info", nchannelsHandler)
 	device.propCom.register("version", versionHandler)
-	if DEBUGDIALOG:
+	if logger.options["debug_dialog"]:
 		device.propCom.register("over", dbgHandler)
 	device.propCom.register("sync", syncHandler)
 
@@ -643,8 +642,7 @@ def main():
 
 	# program termination.  
 	device.propCom.close()
-	if LOGFILE:
-		logger.outFile.close()
+	logger.close()
 
 # start program
 main()

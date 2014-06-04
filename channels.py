@@ -6,8 +6,6 @@ import threading # used for locks
 
 import logger
 
-POINTLOG = False
-MAXBUFFER = 500
 
 
 # --- Class that defines a channel. 
@@ -531,7 +529,7 @@ class AnalogIn(Channel):
 			self.add(pVal, tStamp, rTime)
 			for obj in self.hooks.copy():
 				try:
-					if propCom.POINTDEBUG:
+					if logger.options["debug_points"]:
 						obj.onPoint(self, propCom, pVal, tStamp, rTime, "SlowFreq")
 					else:
 						obj.onPoint(self,propCom, pVal, tStamp, rTime)
@@ -555,7 +553,7 @@ class AnalogIn(Channel):
 				self.add(*point)
 				for obj in self.hooks.copy():
 					try:
-						if propCom.POINTDEBUG:
+						if logger.options["debug_points"]:
 							obj.onPoint(self, propCom, *point, debugObj="HighFreq - " + str(rate))
 						else:
 							obj.onPoint(self, propCom, *point)
@@ -642,7 +640,6 @@ class AnalogIn(Channel):
 	#AnalogIn.flush() Flush any queued data out to the recording file.
 	def flush(self):	
 		"""flushes any queued data out to a file"""
-		#print "flushing " + str( len(self.values) ) + " values at " + str( time.time() )
 		for val in self.values:
 			if self.outfile is not None:
 				strfmt = "{0:.5f},{1}\n".format( self.relativeTime(val[1]) , val[2])
@@ -661,10 +658,10 @@ class AnalogIn(Channel):
 	def add(self, Val, tStamp, rTime):
 		"""add a value into the data queue"""
 		data = (tStamp, rTime, Val)
-		if POINTLOG:
-			print self.name + " + (" + str(data) +")"
+		if logger.options["log_points"]:
+			logger.write(self.name + " + (" + str(data) +")")
 		self.values.append(data)
-		if len(self.values) > MAXBUFFER:
+		if len(self.values) > logger.options["buffer_size"]:
 			self.flush()
 	
 

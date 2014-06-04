@@ -13,11 +13,11 @@ import channels
 import logger
 
 
-DEFAULTBAUD = 115200	# BAUD rate to communicate at
+#DEFAULTBAUD = 115200	# BAUD rate to communicate at
 #DEFAULTBAUD = 57600	# BAUD rate to communicate at
-DEFAULTTIMEOUT = .5	# Timeout for propellor to respond
-DEFAULTREADSLEEP = 0.1 	# Time that the read loop sleeps for. 
-DEFAULTFLUSH = 1 	# Interval to flush channel data 
+#DEFAULTTIMEOUT = .5	# Timeout for propellor to respond
+#DEFAULTREADSLEEP = 0.1 	# Time that the read loop sleeps for. 
+#DEFAULTFLUSH = 1 	# Interval to flush channel data 
 DEFAULTOUTFILE = "test.txt"
 MAX_EID = 200
 MSG_HEAD = 2
@@ -25,19 +25,13 @@ VERNUM = 10		# version 1.0
 EOP = "|"
 ESC = "`"
 
-IGNORECHKSUM = False #ignores bad checksums
-BUFFERLOG = True # turns on logging buffer contents on packet parsing
-PARSELOG = False # turns on debugging info in the parse function.
-MSGLOG = True # turns on logging every message in the log.
-CTRLLOG = True # turns on logging of control messages and their parameters in log. does not include point messages.
-STREAMLOG = False # turns on logging every stream packet in the log. 
-#POINTLOG = False #<- look in channels.py. turns on logging every point through the AnalogI channel interface. 
+#IGNORECHKSUM = False #ignores bad checksums
+#BUFFERLOG = True # turns on logging buffer contents on packet parsing
+#PARSELOG = False # turns on debugging info in the parse function.
+#MSGLOG = True # turns on logging every message in the log.
+#CTRLLOG = True # turns on logging of control messages and their parameters in log. does not include point messages.
+#STREAMLOG = False # turns on logging every stream packet in the log. 
 
-#p_key = re.compile("""<(([^<>@:]+?))(:((([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"])),)*(([^<>'",#$:]*)|(#.{4})|(\$.{2})|(['"].*?['"]))?)?>""", re.DOTALL)  # Matches Any Key!
-#p_wholename = re.compile("<[^@:]*?[:]", re.DOTALL) # matches the entire name including <..|...:  (must have value field)
-#p_name = re.compile("<[^@:]*?[:>]", re.DOTALL) # matches only the name of the key including "< ... :" (no echo) 
-#p_wholeval = re.compile(""":(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)*((#.{4})|(\$.{2})|([^<>"',#$:]*)|(['"][^'"]*['"]))?>""", re.DOTALL) # matches only the value of the key including ": ... >"
-#p_val = re.compile("""(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*)),)|(((['"][^'"]*['"])|(#.{4})|(\$.{2})|([^<>'",#$:]*))>)""", re.DOTALL) # matches only a single value of the value fiel
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
 keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg"]
@@ -192,11 +186,10 @@ class PropCom(threading.Thread):
 				if c == EOP:
 					c = self.com.read(1)
 					buf += c
-					if BUFFERLOG:
-						prebuf = buf
+					prebuf = buf
 					buf = self.parse(buf)
-					if BUFFERLOG and buf != prebuf:
-						print prebuf + " Parsed to " + buf
+					if logger.options["log_buffer"] and buf != prebuf:
+						logger.write(prebuf + " Parsed to " + buf)
 			except serial.SerialException as err:
 				logger.log("SerialException on read", err,logger.WARNING)
 				self.close() # clean-up
@@ -216,21 +209,21 @@ class PropCom(threading.Thread):
 		if self.lastTime is None:
 			self.firstTime = tStamp
 			self.lastTime = tStamp
-			if logger.LOGSYNC:
+			if logger.options["log_sync"]:
 				logger.write( "first: "  + str(self.lastTime) )
 			return 
 			
 		#updates the clock counter with a new value. tests for overflow.
 		if tStamp >= self.lastTime:
 			elapsedTicks = tStamp - self.lastTime
-			if logger.LOGSYNC:
+			if logger.options["log_sync"]:
 				logger.log( "sync", str(self.lastTime) + " -> " + str(tStamp), logger.INFO)
 		else:
 			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
-			if logger.LOGSYNC:
+			if logger.options["log_sync"]:
 				logger.log( "sync (rollover)", str(self.lastTime) + " -> " + str(tStamp), logger.INFO)
 
-		if logger.LOGSYNC:
+		if logger.options["log_sync"]:
 			if elapsedTicks < self.SYNCPERIOD - self.CLOCKERROR:
 				logger.log( "sync too soon! not enough ticks!", elapsedTicks, logger.WARNING)
 			if elapsedTicks > self.SYNCPERIOD + self.CLOCKERROR:
@@ -238,7 +231,7 @@ class PropCom(threading.Thread):
 
 		self.cnt += elapsedTicks
 		self.lastTime = tStamp
-		if logger.LOGSYNC:
+		if logger.options["log_sync"]:
 			logger.write( str(self.cnt) + "ticks. " + str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
 		if abs(self.curTime() - self.estTime()) > .5: #Adjust if time has strayed
 			logger.log("Significant Timing difference between curTime() and estTime()" , str(self.curTime() - self.estTime()),logger.ERROR)
@@ -257,12 +250,12 @@ class PropCom(threading.Thread):
 		if tStamp >= self.lastTime and tStamp - self.lastTime < self.MAXTICK/2: 			# this timestamp is after last sync, and no rollovers
 			elapsedTicks = tStamp - self.lastTime
 		elif self.lastTime - tStamp > self.MAXTICK/2: 	# this timestamp is new, but rolled over since last sync
-			#print "!!" + str(self.lastTime) + "->" + str(tStamp)
+			#logger.write( "!!" + str(self.lastTime) + "->" + str(tStamp))
 			elapsedTicks = tStamp + (self.MAXTICK - self.lastTime)
 		elif tStamp < self.lastTime:  						# this timestamp is slightly old, assuming it is not garbage data.
 			elapsedTicks = tStamp - self.lastTime #returns a negative elapsed time.
 		elif tStamp > self.lastTime and tStamp - self.lastTime > self.MAXTICK/2: #this timestamp is in the past, but clock recently rolled over.
-			print "!!@" + str(self.lastTime) + "->" + str(tStamp)
+			logger.write("!!@" + str(self.lastTime) + "->" + str(tStamp))
 			elapsedTicks = tStamp - self.MAXTICK - self.lastTime
 		else:
 			logger.log("No condition matched for 'realTime()'","Propellor.py", logger.ERROR)
@@ -334,7 +327,7 @@ class PropCom(threading.Thread):
 	# port = A string representation of the port to open. on windows it might look like "COM3"
 
 	def open(self, port=None):
-		self.com.baudrate = DEFAULTBAUD
+		self.com.baudrate = logger.options["baud"]
 		def openPort(self, port):
 			try:
 				self.com.port = port
@@ -392,8 +385,6 @@ class PropCom(threading.Thread):
 				return -1
 			msg = chr(keyTable.index(key)) + chr(self.nextMsgID())
 
-		if CTRLLOG:
-			print msg
 		if value is not None:
 			try:
 				for v in value:
@@ -409,7 +400,8 @@ class PropCom(threading.Thread):
 			chksum = ((chksum<<1) | (chksum>>7)) & 255 # left-rotate
 			chksum = (chksum + ord(c)) % 256           # 8-bit addition
 		msg = msg + EOP + chr(chksum)
-		logger.log( "sending ", msg.replace("\a","@"), logger.INFO)
+		if logger.options["log_msg"]:
+			logger.log( "sending ", msg.replace("\a","@"), logger.INFO)
 		self.comlock.acquire(True)	#block until lock taken	
 		try:
 			retv = self.com.write(msg)
@@ -483,24 +475,24 @@ class PropCom(threading.Thread):
 		DBG1+="#"
 		DBG1+="("+str(ord(c))+")"
 		end = n
-	    if PARSELOG:
-		    print "parsed:[[" + DBG1.replace("\n","@").replace("\r","@") + "]]"
+	    if logger.options["log_parsing"]:
+		    logger.write("parsed:[[" + DBG1.replace("\n","@").replace("\r","@") + "]]")
 		
 	    if end==-1:       
 		    pass # no packets found.
 	    else:
 	      msgBuffer = msgBuffer[n-2:]
-	      if  chk != chksum and chk!=0 and not IGNORECHKSUM:
-		      if CTRLLOG:
-			      print "BAD CHECKSUM!"
-			      print "sent:"+str(chk)+" calculated:"+str(chksum)
+	      if  chk != chksum and chk!=0 and not logger.options["ignore_checksum"]:
+		      if logger.options["log_bad_checksum"]:
+			      logger.write( "BAD CHECKSUM!")
+			      logger.write( "sent:"+str(chk)+" calculated:"+str(chksum))
 	      else:
 	        if len(packet) == 0:         
 	          logger.log( "Bad Packet","No bytes!", logger.WARNING)
 	        elif ord(packet[0]) & 128:
 	          self.parseStream(packet)
 	        else:
-		  if MSGLOG:
+		  if logger.options["log_msg"]:
 	            logger.log("found",packet.replace("\a","@"),logger.INFO)
 	          self.parseControl(packet)
 	    
@@ -511,8 +503,7 @@ class PropCom(threading.Thread):
 		''' parses a stream packet and passes parsed values to any registered stream listener objects'''
 		c = ord(packet[0])
 		streamID = (ord(packet[0])>>4) & 7
-		#print c
-		if STREAMLOG:
+		if logger.options["log_stream"]:
 			logger.log("Stream ["+str(streamID)+"]","",logger.INFO)
 
 		values = []
@@ -539,8 +530,8 @@ class PropCom(threading.Thread):
 				if valBits <= 0:
 					values.append(val)
 					n+=1
-					if STREAMLOG:
-						print( "   :" + str(val)),
+					if logger.options["log_stream"]:
+						logger.write( "   :" + str(val),True)
 					val = 0
 					if n<=1:
 						valBits = 32
@@ -580,11 +571,11 @@ class PropCom(threading.Thread):
 		  exData.append(curVal)
 		  curVal = 0
 		  m = 0
-          if nameNum != 13 and CTRLLOG: # special debug magic packet
-	    print("::" + str(nameNum) + "-" + str(self.lastPkt) + " = "),
+          if nameNum != 13 and logger.options["log_control"]: # ignore point messages in coltrol log
+	    logger.write("::" + str(nameNum) + "-" + str(self.lastPkt) + " = ",True)
 	    for v in exData:
-	      print(v),
-	    print " "
+	      logger.write(v,True)
+	    logger.write(" ")
 	  self.call(nameNum, exData)
 	  return  
 
@@ -643,11 +634,7 @@ class PropCom(threading.Thread):
 		opened = [False]	# whether or not a valid port has been opened. 
 		retry = True		# whether or not function will retry opening
 		com = serial.Serial()
-		#print "Baud Rate:" + str(self.com.baudrate)
 		com.baudrate = self.com.baudrate
-		#print "Baud Rate:" + str(com.baudrate)
-		#print com.BAUDRATES
-		#print com.getSettingsDict()
 
 
 		while opened[0] == False and retry == True:
@@ -674,10 +661,10 @@ class PropCom(threading.Thread):
 					com.write(verStr)
 					self.comlock.release()		#release comlock for others!	
 
-					time.sleep(DEFAULTTIMEOUT)
+					time.sleep(logger.options["timeout"])
 					resp = com.read(com.inWaiting())
-					if PARSELOG:
-						print resp
+					if logger.options["log_parsing"]:
+						logger.write(resp)
 					parsed = self.parse(EOP + " " + resp)
 				except (serial.serialutil.SerialException, ValueError, serial.serialutil.SerialTimeoutException) as err: 
 					logger.log("Error with port", com.port, logger.WARNING)
