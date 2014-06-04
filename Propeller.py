@@ -1,7 +1,6 @@
 import serial
 import serial.tools.list_ports
 import time
-#import re
 import threading
 import RepeatTimer
 import sys
@@ -13,24 +12,12 @@ import channels
 import logger
 
 
-#DEFAULTBAUD = 115200	# BAUD rate to communicate at
-#DEFAULTBAUD = 57600	# BAUD rate to communicate at
-#DEFAULTTIMEOUT = .5	# Timeout for propellor to respond
-#DEFAULTREADSLEEP = 0.1 	# Time that the read loop sleeps for. 
-#DEFAULTFLUSH = 1 	# Interval to flush channel data 
 DEFAULTOUTFILE = "test.txt"
 MAX_EID = 200
 MSG_HEAD = 2
 VERNUM = 10		# version 1.0
 EOP = "|"
 ESC = "`"
-
-#IGNORECHKSUM = False #ignores bad checksums
-#BUFFERLOG = True # turns on logging buffer contents on packet parsing
-#PARSELOG = False # turns on debugging info in the parse function.
-#MSGLOG = True # turns on logging every message in the log.
-#CTRLLOG = True # turns on logging of control messages and their parameters in log. does not include point messages.
-#STREAMLOG = False # turns on logging every stream packet in the log. 
 
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 

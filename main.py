@@ -33,14 +33,6 @@ frame = None
 plugins = [] # list of loaded plugin modules
 pluginTree = [] # list of menu's
 
-#TOOLPATH = "plugins"
-#PROGRESS_PRECISION = 25
-#LOGCONSOLE = True
-#LOGFILE = True
-#PRINTOUT = True
-#POINTDEBUG = False
-#DEBUGDIALOG = False
-
 #class ChannelWidgets A container for widgets relating to a channel
 class ChannelWidgets():
 	name = "name"
@@ -323,8 +315,8 @@ class NewGui(GUI3.MainFrame):
 
 			self.widgets[idx].progressTimers = []
 			self.widgets[idx].progressTimers.append(RepeatTimer.Timer(1, True, decTimer))
-			for n in range(PROGRESS_PRECISION-1):
-				self.widgets[idx].progressTimers.append(threading.Timer((n+1)*(float(runForSeconds)/PROGRESS_PRECISION),incGauge)) 
+			for n in range(logger.options["progress_precision"]-1):
+				self.widgets[idx].progressTimers.append(threading.Timer((n+1)*(float(runForSeconds)/logger.options["progress_precision"]),incGauge)) 
 
 			def onStop():
 				# TODO is GUI still alive???
