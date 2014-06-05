@@ -498,18 +498,21 @@ def addTools(searchdir):
 				logger.log("Loaded Plugin", mod, logger.INFO)
 	return items
 
-def importTools(relPath):
+def importTools(paths):
 	"""searches a directory and fills pluginTree"""
 	global pluginTree
-	global pludins
+	global plugins
 
 	plugins = [] # list of loaded plugin modules
-	pluginTree = [] # list of menu's
+	pluginTree = [] # list of menus
 
-	cwd = os.getcwd()
-	toolDirPath = os.path.join(cwd, relPath)
+	if isinstance(paths, basestring):
+		paths = [paths]
 
-	items = addTools(toolDirPath)
+	items = []
+	for path in paths:
+		items.extend(  addTools(os.path.abspath(path)) )
+	
 	baseDir = []
 	for i in items:
 		try:
