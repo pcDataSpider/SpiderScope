@@ -8,12 +8,12 @@ config.set("DEFAULT", "progress_precision", "25")
 
 config.add_section("logging")
 config.set("logging", "file", "log.txt") #which file to log to
-config.set("logging", "console", "True") #log to the console or not
+config.set("logging", "console", "False") #log to the console or not
 config.set("logging", "log_sync", "False") #log information about sync packets
 config.set("logging", "log_points", "False") # log every data point
 config.set("logging", "log_stream", "False") # log every stream packet
 config.set("logging", "log_control", "False") # log every control packet
-config.set("logging", "log_msg", "True") # log all messages back and forth. (not streams)
+config.set("logging", "log_msg", "False") # log all messages back and forth. (not streams)
 config.set("logging", "log_buffer", "False") # log the entire buffer anytime there is at least one packet
 config.set("logging", "log_parsing", "False") # log the parsing process
 config.set("logging", "log_bad_checksum", "False") # log all bad checksums

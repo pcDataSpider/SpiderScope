@@ -84,12 +84,14 @@ class NewGui(GUI3.MainFrame):
 
 		name = node[0]
 		items = node[1]
+		menu = None
 		try:
 			menu = wx.Menu()
 			for i in items:
 				logger.write( "adding" )
 				self.buildSubMenu(i, menu)
-			parent.AppendSubMenu( menu, name )
+			if parent is not None:
+				parent.AppendSubMenu( menu, name )
 
 		except TypeError as e:
 			logger.write( "Type Error:" )
@@ -105,6 +107,7 @@ class NewGui(GUI3.MainFrame):
 					logger.log("Unhandled Exception in " + item.title, e, logger.ERROR)
 			newitem = wx.MenuItem( parent, wx.ID_ANY, item.title, item.description, wx.ITEM_NORMAL )
 			self.Bind( wx.EVT_MENU, handler, id=newitem.GetId())
+
 			parent.AppendItem(newitem)	
 
 		logger.write( "Submenu Built" )
@@ -116,7 +119,7 @@ class NewGui(GUI3.MainFrame):
 			logger.write( "Building " + i[0] + " Menu" )
 			name = i[0]
 			menu = wx.Menu()
-			menuBar.Append( self.buildSubMenu(i, menu), name )
+			menuBar.Append( self.buildSubMenu(i, None), name )
 	def createMenubar(self, items):
 		logger.write( "Creating Menubar:" )
 		logger.write( items )
@@ -124,6 +127,7 @@ class NewGui(GUI3.MainFrame):
 		fileMenu = wx.Menu()
 		self.toolsMenu = wx.Menu()
 		helpMenu = wx.Menu()
+
 
 		menuBar.Append(fileMenu, "File")
 		self.buildMenus(items, menuBar)
@@ -467,7 +471,9 @@ class NewGui(GUI3.MainFrame):
 def testplugin(module):
 	"""returns True if module has nessesary parameters"""
 	try:
-		logger.write( module.title )
+		module.title
+		module.description
+		module.run_tool
 	except AttributeError as e:
 		return False
 	return True 
@@ -502,17 +508,16 @@ def importTools(relPath):
 
 	cwd = os.getcwd()
 	toolDirPath = os.path.join(cwd, relPath)
-	try:
-		files = os.listdir( toolDirPath )
-	except Exception as e:
-		logger.log("Unable to open plugin directory", e, logger.WARNING)
-		return
-	for f in files:
-		fullpath = os.path.join(toolDirPath, f)
-		if os.path.isdir( fullpath ):
-			pluginTree.append((f, addTools(fullpath))) 
-		else:
-			logger.log("Bad plugin in base directory", f, logger.WARNING)
+
+	items = addTools(toolDirPath)
+	baseDir = []
+	for i in items:
+		try:
+			i[1][0]
+			pluginTree.append(i)
+		except TypeError:
+			baseDir.append(i)
+	pluginTree.insert(0,("Plugins", baseDir))
 
 # ----- Starts Here -----		
 def main():
@@ -525,7 +530,7 @@ def main():
 	try:
 		importTools(logger.options["plugin_dir"])
 	except Exception as e:
-		logger.log("Unable to import tools:", e, logger.WARNING)
+		logger.log("Unable to import plugins:", e, logger.WARNING)
 	# make GUI
 	app = wx.PySimpleApp()
 	frame = NewGui(None)
