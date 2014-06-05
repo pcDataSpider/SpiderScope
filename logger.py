@@ -13,6 +13,7 @@ outFile = None
 
 #function logger.setOptions( Dict ) Sets the global option dicsionary to the given Dict.
 def setOptions( o ):
+	global outFile
 	global options
 	options = o
 	# open the outfile
@@ -37,7 +38,7 @@ def write( msg ,sameLine=False):
 				print(msg),
 			else:
 				print msg
-		if outFile != None:
+		if outFile is not None:
 			if sameLine:
 				outFile.write( str(msg) )
 			else:

@@ -1,5 +1,5 @@
 [DEFAULT]
-plugin_dir = ..\plugins
+plugin_dir = ../plugins
 progress_precision = 25
 
 [logging]
