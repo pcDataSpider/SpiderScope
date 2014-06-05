@@ -32,16 +32,23 @@ config.read("config.txt")
 
 
 def load(section):
-	for (k,v) in config.items(section):
-		try:
-			v = float(v)
-			options[k] = v
-		except ValueError:
-			if v.lower() == "true":
-				v = True
-			elif v.lower() == "false":
-				v = False
-			options[k] = v
+	for (field,value) in config.items(section):
+		vals = value.split(",")
+		for i in xrange(0,len(vals)):
+			v = vals[i]
+			try:
+				v = float(v)
+			except ValueError:
+				if v.lower() == "true":
+					v = True
+				elif v.lower() == "false":
+					v = False
+			vals[i] = v
+		if len(vals)>1:
+			options[field] = vals
+		else:
+			options[field] = vals[0]
+		print field + ":" + str(options[field]) + " " + str(type(options[field]))
 
 load("DEFAULT")
 load("logging")

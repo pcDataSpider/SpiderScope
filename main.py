@@ -491,11 +491,14 @@ def addTools(searchdir):
 			items.append( (name, addTools(fullPath)) )
 		elif f[-3:] == ".py":
 			name = f[:-3]
-			mod = imp.load_source(name, fullPath)
-			if testplugin(mod):
-				logger.write( name + " <-" )
-				items.append((name,mod))
-				logger.log("Loaded Plugin", mod, logger.INFO)
+			try:
+				mod = imp.load_source(name, fullPath)
+				if testplugin(mod):
+					logger.write( name + " <-" )
+					items.append((name,mod))
+					logger.log("Loaded Plugin", mod, logger.INFO)
+			except SyntaxError:
+				logger.log("Invalid syntax!", fullPath, logger.ERROR)
 	return items
 
 def importTools(paths):
@@ -511,7 +514,10 @@ def importTools(paths):
 
 	items = []
 	for path in paths:
-		items.extend(  addTools(os.path.abspath(path)) )
+		try:
+			items.extend(  addTools(os.path.abspath(path)) )
+		except OSError:
+			logger.lod("Failed to load plugins", path, logger.WARNING)
 	
 	baseDir = []
 	for i in items:
