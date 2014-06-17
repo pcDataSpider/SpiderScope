@@ -252,19 +252,23 @@ class Digitals(Channel):
 			self.resetWidgets()
 		def digHook(propCom,  dVal, tStamp):
 			logger.write("digHook hit")
+			rTime = propCom.realTime(tStamp)
 			with self.lock:
 				for obj in self.hooks.copy():
 						try:
 							if obj.digIdx is not None:
 								idxmask =  (1<<obj.digIdx) 
+							elif obj.digMask:
+								idxmask = obj.digMask
 							else:
 								idxmask = 0
+
 							if (self.inVals ^ dVal) & idxmask: # test if selected idx changed
 								if dVal &  idxmask :
-									obj.onHigh(self, propCom, dVal)
+									obj.onHigh(self, propCom, dVal, rTime)
 								else:
-									obj.onLow(self, propCom, dVal)
-							obj.onChange(self, propCom, dVal)
+									obj.onLow(self, propCom, dVal, rTime)
+							obj.onChange(self, propCom, dVal, rTime)
 						except Exception as e:
 							logger.log("Error with digHook (channels.py - Digitals) obj=" + str(obj), e, logger.WARNING)
 

@@ -487,7 +487,7 @@ def addTools(searchdir):
 	for f in files:
 		name = f
 		fullPath = os.path.join(searchdir, f)
-		if os.path.isdir( fullPath ):
+		if os.path.isdir( fullPath ) and f[0]!=".": #exclude hidden folders
 			items.append( (name, addTools(fullPath)) )
 		elif f[-3:] == ".py":
 			name = f[:-3]
@@ -540,6 +540,7 @@ def main():
 		importTools(logger.options["plugin_dir"])
 	except Exception as e:
 		logger.log("Unable to import plugins:", e, logger.WARNING)
+	print sys.path
 	# make GUI
 	app = wx.PySimpleApp()
 	frame = NewGui(None)

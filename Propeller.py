@@ -21,8 +21,12 @@ ESC = "`"
 
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
-keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg"]
+keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg", "timer", "event", "resetevents"]
+conditions = ["timerExpire", "always", "onChange", "onHigh", "onLow", "whileHigh", "whileLow"]
+actions = ["setTimer", "notify", "AIStart", "AIStop"]
 
+conditions = ["timerExpire", "always", "onChange", "onHigh", "onLow", "whileHigh", "whileLow"]
+actions = ["setTimer", "notify", "AIStart", "AIStop"]
 
 # -- Class that holds one integer point.
 class Data():
@@ -389,6 +393,7 @@ class PropCom(threading.Thread):
 		msg = msg + EOP + chr(chksum)
 		if logger.options["log_msg"]:
 			logger.log( "sending ", msg.replace("\a","@"), logger.INFO)
+			logger.log( "sending ", str(key) + " " + str(value), logger.INFO)
 		self.comlock.acquire(True)	#block until lock taken	
 		try:
 			retv = self.com.write(msg)
