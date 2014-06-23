@@ -93,6 +93,9 @@ class Device():
 				self.setNAvg(self.channels[x].value/self.propCom.MIN_ADC_PERIOD)
 				# notify user of change
 				logger.message("Average filter is too high. \n Setting to " + str(self.propCom.nAvg) + " sample average.")
+		if self.propCom.nAvg > self.propCom.MAX_AVG:
+			self.propCom.nAvg = self.propCom.MAX_AVG
+			logger.message("Average filter is too high. \n Setting to " + str(self.propCom.nAvg) + " sample average.")
 
 		self.propCom.send("avg", self.propCom.nAvg)
 		
@@ -128,6 +131,7 @@ class PropCom(threading.Thread):
 	SYNCPERIOD = 80000000
 	CLOCKERROR = 20000
 	MIN_ADC_PERIOD = 8000
+	MAX_AVG = 100
 	nAvg = 1
 	name = "?"
 	com = None
