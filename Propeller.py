@@ -480,8 +480,12 @@ class PropCom(threading.Thread):
 	      msgBuffer = msgBuffer[n-2:]
 	      if  chk != chksum and chk!=0 and not logger.options["ignore_checksum"]:
 		      if logger.options["log_bad_checksum"]:
-			      logger.write( "BAD CHECKSUM!")
-			      logger.write( "sent:"+str(chk)+" calculated:"+str(chksum))
+			logger.write( "BAD CHECKSUM!")
+			if ord(packet[0]) & 128:
+				logger.write("BAD CHECKSUM! (stream)")
+			else:
+				logger.write("BAD CHECKSUM! (control)")
+			logger.write( "sent:"+str(chk)+" calculated:"+str(chksum))
 	      else:
 	        if len(packet) == 0:         
 	          logger.log( "Bad Packet","No bytes!", logger.WARNING)
