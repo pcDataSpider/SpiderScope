@@ -504,10 +504,10 @@ class PropCom(threading.Thread):
 
 		values = []
 		val = 0
-		valBits=32
-		byteBits=4
+		valBits=32 # bits left to read for the current val
+		byteBits=4 # bits left in the current byte
 		packet = chr(ord(packet[0])&15) + packet[1:]
-
+		bytesLeft = len(packet) # bytes left in packet
 
 		n=0
 
@@ -531,9 +531,12 @@ class PropCom(threading.Thread):
 					val = 0
 					if n<=1:
 						valBits = 32
+					elif bytesLeft <= 5:
+						valBits = 32
 					else:
 						valBits = 12
 			byteBits = 8 # prepare for next byte
+			bytesLeft -= 1
 		self.callStream(streamID, values)
 
 	  

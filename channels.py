@@ -543,13 +543,22 @@ class AnalogIn(Channel):
 		def streamListener(propCom, values):
 			rate = values[0]
 			tStamp = values[1]
+			lastTStamp = values[-1]
+			nPoints = len(values[2:-1])
+			rate = (lastTStamp - tStamp)/nPoints
+
 			rTime = propCom.realTime(tStamp)
+			lastRTime = propCom.realTime(lastTStamp)
+			rTimeRate =  (float(rate)/propCom.CLOCKPERSEC)
+
 
 			points = []
 			n = 0
-			for v in values[2:]:
+			for v in values[2:-1]:
 				curTStamp =  tStamp + rate*n
-				curRTime = rTime + (float(rate)/propCom.CLOCKPERSEC)*n
+				curRTime = rTime + rTimeRate *n
+				if curRTime > lastRTime:
+					logger.log("Time is too late! math error in streamListener",  str(curRTime) + ">" + str(lastRTime) + " dif:" + str(curRTime - lastRTime))
 				if curTStamp > 1<<32:
 					curTStamp -= (1<<32)
 				point = (v, curTStamp, curRTime )
@@ -564,22 +573,6 @@ class AnalogIn(Channel):
 					except Exception as e:
 						logger.log("Error with streamListener (channels.py)", e, logger.WARNING)
 				n+=1
-
-		
-			
-	#	def pointHook(propCom,  cIdx, pVal, tStamp):
-	#		try:
-	#			rTime = self.realTime(tStamp)
-	#			self.add(pVal,tStamp,rTime)
-	#			for obj in self.hooks.copy():
-	#				try:
-	#					obj.onPoint(self, propCom, pVal, tStamp, rTime)
-	#				except Exception as e:
-	#					logger.log("Error with pointHook (channels.py)", e, logger.WARNING)
-	#		except ValueError as e:
-	#			logger.log("Incorrect values to 'p'", e, logger.WARNING)
-	#		except TypeError as e:
-	#			logger.log("Incorrect types to 'p'", e, logger.WARNING)
 
 		propCom.register("info", infoHook, test=idxTest)
 		propCom.register("point", pointHook, test=pointIdxTest)
