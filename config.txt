@@ -1,5 +1,5 @@
 [DEFAULT]
-;plugin_dir = ../Plugins
+plugin_dir = ../Plugins
 progress_precision = 25
 
 [logging]
@@ -8,13 +8,14 @@ console = True
 log_sync = False
 log_points = False
 log_stream = False
-log_control = True
-log_msg = True
+log_control = False
+log_msg = False
 log_buffer = False
 log_parsing = False
 log_bad_checksum = True
 debug_points = False
 debug_dialog = False
+debug_checksum = True
 
 [com]
 baud = 115200

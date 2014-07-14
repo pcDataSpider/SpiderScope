@@ -478,7 +478,10 @@ class PropCom(threading.Thread):
 		    pass # no packets found.
 	    else:
 	      msgBuffer = msgBuffer[n-2:]
-	      if  chk != chksum and chk!=0 and not logger.options["ignore_checksum"]:
+	      
+	      if len(packet) < 1:         
+	        logger.log( "Bad Packet","No bytes!", logger.WARNING)
+	      elif  chk != chksum and chk!=0 and not logger.options["ignore_checksum"]:
 		      if logger.options["log_bad_checksum"]:
 			logger.write( "BAD CHECKSUM!")
 			if ord(packet[0]) & 128:
@@ -486,10 +489,10 @@ class PropCom(threading.Thread):
 			else:
 				logger.write("BAD CHECKSUM! (control)")
 			logger.write( "sent:"+str(chk)+" calculated:"+str(chksum))
+			if logger.options["debug_checksum"]:
+				logger.write(DBG1)
 	      else:
-	        if len(packet) == 0:         
-	          logger.log( "Bad Packet","No bytes!", logger.WARNING)
-	        elif ord(packet[0]) & 128:
+	        if ord(packet[0]) & 128:
 	          self.parseStream(packet)
 	        else:
 		  if logger.options["log_msg"]:

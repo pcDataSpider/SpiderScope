@@ -251,8 +251,7 @@ class Digitals(Channel):
 			self.setDir(dirs)
 			self.resetWidgets()
 		def digHook(propCom,  dVal, tStamp):
-			logger.write("digHook hit")
-			rTime = propCom.realTime(tStamp)
+			rFalseTime = propCom.realTime(tStamp)
 			with self.lock:
 				for obj in self.hooks.copy():
 						try:
@@ -525,9 +524,7 @@ class AnalogIn(Channel):
 				else:
 					self.stop()
 
-		def pointHook(propCom, pVal, tStamp, dummy=0):
-			if dummy == 0:
-				raise Exception()
+		def pointHook(propCom, pVal, tStamp):
 			pVal = pVal & 0xFFF
 			rTime = propCom.realTime(tStamp)
 			self.add(pVal, tStamp, rTime)
