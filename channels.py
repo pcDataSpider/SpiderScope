@@ -159,8 +159,8 @@ class Channel():
 				logger.log("error with onStop:", e , logger.WARNING)
 				pass
 
-	#function Channel.setValue( Anything newval ) Set the value of this channel to *newval*
-	def setValue(self, newval):
+	#function Channel.setValue( Anything newval, [Bool limit] ) Set the value of this channel to *newval*. if limit=True then limit the value to safe values.
+	def setValue(self, newval, limit=False):
 		"""Change the value of this channel"""
 		for obj in self.hooks.copy():
 			try:
@@ -456,7 +456,7 @@ class AnalogOut(Channel):
 		self.propCom.send("set", [self.idx, 0])
 	# function AnalogOut.setValue(Int newVal) Set the output power of this channel. If this channel is not on, it will **not** emit power.
 	# newVal = Desired output level from 0-1000
-	def setValue(self, newval):
+	def setValue(self, newval, limit=False):
 		Channel.setValue(self, int(newval))
 		if self.started:
 			self.propCom.send("set", [self.idx, self.value])
@@ -630,8 +630,10 @@ class AnalogIn(Channel):
 
 	#AnalogIn.setValue(Int newval) Change the sampling rate of this channel to *newval* in samples per second.
 	# newval = the desired sampling rate specified in samples-per-second
-	def setValue(self, newval):
+	def setValue(self, newval, limit=False):
 		"""sets a new sample rate, specified in samples per second, for this channel"""
+		if limit and newval > self.propCom.MAX_RATE:
+			newval = self.propCom.MAX_RATE
 		Channel.setValue(self, int( self.clockFreq / float(newval) ))
 
 		self.testAverage()

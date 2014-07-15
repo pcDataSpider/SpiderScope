@@ -212,7 +212,7 @@ class NewGui(GUI3.MainFrame):
 		global device
 		try:
 			value = float(self.widgets[idx].channelValue.GetValue())
-			device.channels[idx].setValue(value)
+			device.channels[idx].setValue(value, True)
 			value = device.channels[idx].value
 		except ValueError:
 			self.widgets[idx].channelValue.SetLabel("NaN")
