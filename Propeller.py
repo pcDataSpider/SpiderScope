@@ -158,8 +158,10 @@ class PropCom(threading.Thread):
 		self.daemon = True
 		self.setDaemon(True)
 		self.lastPkt = 0
+		self.lastTStamp = dict()
+		self.lastRTime = dict()
 		self.lastTime = None
-		self.lastRTime = 0
+		#self.lastRTime = 0
 		self.cnt = 0
 		self.MAXTICK = (1 << 32) -1
 		self.port=None # initial port to attempt to open. overrides default search
@@ -229,7 +231,7 @@ class PropCom(threading.Thread):
 		self.lastTime = tStamp
 		if logger.options["log_sync"]:
 			logger.write( str(self.cnt) + "ticks. " + str(self.curTime()) + "seconds from first sync. estimated " + str(self.estTime()))
-		if abs(self.curTime() - self.estTime()) > .5: #Adjust if time has strayed
+		if abs(self.curTime() - self.estTime()) > 1.0: #Adjust if time has strayed
 			logger.log("Significant Timing difference between curTime() and estTime()" , str(self.curTime() - self.estTime()),logger.ERROR)
 			self.cnt -= (self.curTime() - self.estTime())*self.CLOCKPERSEC
 
@@ -242,7 +244,7 @@ class PropCom(threading.Thread):
 
 	# function PropCom.realTime(Int tStamp) return Float The time in seconds since the first sync this timestamp corresponds to.
 	# tStamp = the timestamp to be converted. Must be within +- 1/2 clock cycle since the last sync to avoid errors
-	def realTime(self, tStamp):
+	def realTime(self, tStamp, streamID=-1):
 		if tStamp >= self.lastTime and tStamp - self.lastTime < self.MAXTICK/2: 			# this timestamp is after last sync, and no rollovers
 			elapsedTicks = tStamp - self.lastTime
 		elif self.lastTime - tStamp > self.MAXTICK/2: 	# this timestamp is new, but rolled over since last sync
@@ -257,14 +259,21 @@ class PropCom(threading.Thread):
 			logger.log("No condition matched for 'realTime()'","Propellor.py", logger.ERROR)
 			elapsedTicks = 0
 
+		try:
+			lastRTime = self.lastRTime[streamID]
+			lastTStamp = self.lastTStamp[streamID]
+		except KeyError as e:
+			lastRTime = 0
+			lastTStamp = 0
+
 		rTime = (self.cnt + elapsedTicks) / float(self.CLOCKPERSEC)
-		if self.lastRTime > rTime:
-			logger.log("Went back in time??? ("+str(self.lastTStamp)+"->"+str(tStamp)+") Dif="+str(self.lastTStamp-tStamp)+"ticks, " + str(self.lastRTime-rTime)+"seconds",rTime,logger.WARNING)
-		self.lastTStamp = tStamp
-		self.lastRTime = rTime
+		if lastRTime > rTime + 0.5:
+			logger.log("Went back in time??? [" + str(streamID) + "]  ("+str(lastTStamp)+"->"+str(tStamp)+") Dif="+str(lastTStamp-tStamp)+"ticks, " + str(lastRTime-rTime)+"seconds",rTime,logger.WARNING)
+		self.lastTStamp[streamID] = tStamp
+		self.lastRTime[streamID] = rTime
 
 
-		return self.lastRTime
+		return rTime
 	# functino PropCom.nextMsgID() return Int a sequential message ID for the next message to be sent.
 	def nextMsgID(self):
 		self.msgID = (self.msgID + 1) & 255
@@ -396,9 +405,9 @@ class PropCom(threading.Thread):
 			chksum = ((chksum<<1) | (chksum>>7)) & 255 # left-rotate
 			chksum = (chksum + ord(c)) % 256           # 8-bit addition
 		msg = msg + EOP + chr(chksum)
-		if logger.options["log_msg"]:
-			logger.log( "sending ", msg.replace("\a","@"), logger.INFO)
+		if logger.options["log_sent"]:
 			logger.log( "sending ", str(key) + " " + str(value), logger.INFO)
+			logger.log( "	raw: ", msg.replace("\a","@"), logger.INFO)
 		self.comlock.acquire(True)	#block until lock taken	
 		try:
 			retv = self.com.write(msg)

@@ -251,7 +251,7 @@ class Digitals(Channel):
 			self.setDir(dirs)
 			self.resetWidgets()
 		def digHook(propCom,  dVal, tStamp):
-			rFalseTime = propCom.realTime(tStamp)
+			rFalseTime = propCom.realTime(tStamp, self.idx)
 			with self.lock:
 				for obj in self.hooks.copy():
 						try:
@@ -526,7 +526,7 @@ class AnalogIn(Channel):
 
 		def pointHook(propCom, pVal, tStamp):
 			pVal = pVal & 0xFFF
-			rTime = propCom.realTime(tStamp)
+			rTime = propCom.realTime(tStamp, self.idx)
 			self.add(pVal, tStamp, rTime)
 			for obj in self.hooks.copy():
 				try:
@@ -550,8 +550,8 @@ class AnalogIn(Channel):
 				else:
 					rate = (lastTStamp - tStamp)/nPoints
 
-			rTime = propCom.realTime(tStamp)
-			lastRTime = propCom.realTime(lastTStamp)
+			rTime = propCom.realTime(tStamp, self.idx)
+			lastRTime = propCom.realTime(lastTStamp, self.idx)
 			rTimeRate =  (float(rate)/propCom.CLOCKPERSEC)
 
 
