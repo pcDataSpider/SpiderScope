@@ -559,7 +559,7 @@ class AnalogIn(Channel):
 				if curTStamp > propCom.MAX_CLOCK:
 					curTStamp = curTStamp - propCom.MAX_CLOCK
 				curRTime = rTime + rTimeRate *n
-				if curRTime > lastRTime:
+				if curRTime > lastRTime + rTimeRate/3:
 					logger.log("Time is too late! math error in streamListener",  str(curRTime) + ">" + str(lastRTime) + " dif:" + str(curRTime - lastRTime))
 				if curTStamp > 1<<32:
 					curTStamp -= (1<<32)
