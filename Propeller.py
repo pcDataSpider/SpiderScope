@@ -132,6 +132,7 @@ class PropCom(threading.Thread):
 	CLOCKERROR = 20000
 	MIN_ADC_PERIOD = 8000
 	MAX_AVG = 100
+	MAX_CLOCK = (1<<32) - 1
 	nAvg = 1
 	name = "?"
 	com = None
