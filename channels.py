@@ -542,10 +542,13 @@ class AnalogIn(Channel):
 			tStamp = values[1]
 			lastTStamp = values[-1]
 			nPoints = len(values[2:-1]) - 1
-			if tStamp > lastTStamp:
-				rate = ((propCom.MAX_CLOCK - tStamp) + lastTStamp) /nPoints
+			if nPoints == 0:
+				rate = 0
 			else:
-				rate = (lastTStamp - tStamp)/nPoints
+				if tStamp > lastTStamp:
+					rate = ((propCom.MAX_CLOCK - tStamp) + lastTStamp) /nPoints
+				else:
+					rate = (lastTStamp - tStamp)/nPoints
 
 			rTime = propCom.realTime(tStamp)
 			lastRTime = propCom.realTime(lastTStamp)
