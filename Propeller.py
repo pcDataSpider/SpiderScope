@@ -133,6 +133,7 @@ class PropCom(threading.Thread):
 	MIN_ADC_PERIOD = 1500
 	MAX_AVG = 100
 	MAX_CLOCK = (1<<32) - 1
+	MAX_RATE = 1500 # max sampling rate in samples per second
 	nAvg = 1
 	name = "?"
 	com = None
