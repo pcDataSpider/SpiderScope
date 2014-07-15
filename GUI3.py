@@ -274,7 +274,7 @@ class TopPanel ( wx.Panel ):
 class MainFrame ( wx.Frame ):
 	def __init__( self, parent, items ):
 		"""Constructor"""
-		wx.Frame.__init__(self, parent=None, title="OFSI DAQ Tool")
+		wx.Frame.__init__(self, parent=None, title="SpiderScope")
 		self.fSizer = wx.BoxSizer(wx.VERTICAL)
 		self.channelSizer = wx.BoxSizer(wx.HORIZONTAL)
 		self.leftSizer = wx.BoxSizer(wx.VERTICAL)
@@ -343,10 +343,10 @@ class MainFrame ( wx.Frame ):
 	def OnAbout(self, event):
 		info = wx.AboutDialogInfo()
 		info.SetCopyright("(C) 2012 Optical Fiber Systems inc.")
-		info.SetName("OFSI Data Aquisition Software")
-		info.SetDescription(" software to gather data, perform automated tests, and more!" )
+		info.SetName("SpiderScope Data Aquisition Software")
+		info.SetDescription(" software to gather data, perform automated tests, and other functions using the DataSpider modules" )
 		info.SetVersion(str(logger.VERSION))
-		info.SetWebSite("http://opticalfibersystems.com")
+		info.SetWebSite("http://pcdataspider.com")
 		wx.AboutBox(info)
 	def OnClose(self, event):
 		pass
