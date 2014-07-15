@@ -542,7 +542,10 @@ class AnalogIn(Channel):
 			tStamp = values[1]
 			lastTStamp = values[-1]
 			nPoints = len(values[2:-1])
-			rate = (lastTStamp - tStamp)/nPoints
+			if tStamp > lastTStamp:
+				rate = ((propCom.MAX_CLOCK - lastTStamp) + tStamp) /nPoints
+			else:
+				rate = (lastTStamp - tStamp)/nPoints
 
 			rTime = propCom.realTime(tStamp)
 			lastRTime = propCom.realTime(lastTStamp)
@@ -553,6 +556,8 @@ class AnalogIn(Channel):
 			n = 0
 			for v in values[2:-1]:
 				curTStamp =  tStamp + rate*n
+				if curTStamp > propCom.MAX_CLOCK:
+					curTStamp = curTStamp - propCom.MAX_CLOCK
 				curRTime = rTime + rTimeRate *n
 				if curRTime > lastRTime:
 					logger.log("Time is too late! math error in streamListener",  str(curRTime) + ">" + str(lastRTime) + " dif:" + str(curRTime - lastRTime))
