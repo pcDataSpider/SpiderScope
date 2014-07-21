@@ -21,7 +21,7 @@ ESC = "`"
 
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
-keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg", "timer", "event", "resetevents"]
+keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg", "timer", "event", "resetevents", "trigger"]
 
 
 # -- Class that holds one integer point.
@@ -44,8 +44,8 @@ class Data():
 
 class Device():
 
-	actions = ["SetTimer", "Notify", "AIStart", "AIStop", "DigHigh", "DigLow"] 
-	conditions = ["TimerExpire", "Always", "OnChange", "OnHigh", "OnLow", "WhileHigh", "WhileLow"]
+	actions = ["SetTimer", "Notify", "AIStart", "AIStop", "DOHigh", "DOLow"] 
+	conditions = ["TimerExpire", "Always", "OnChange", "OnHigh", "OnLow", "WhileHigh", "WhileLow", "OnTrigger"]
 
 	propCom = None
 	analogIn = dict()
@@ -118,12 +118,21 @@ class Device():
 			else:
 				logger.log("Bad Channel Querry", chan, logger.WARNING)
 	# function Device.addEvent( String condition, Int condParam, String action, Int actionParam ) Add a new event, that executes *action* with specified parameters in *actionParam* when *condition* is met with the given parameters in *condParam*. *condition* and *action* should match entries in the device condition and action tables.
-	def addEvent(self, condition, condParam, action, actionParam):
-		self.propCom.send( "event", [self.conditions.index(condition), self.actions.index(action), condParam, actionParam])
+	def addEvent(self, condition, condParam, *actionArg):
 
-	#function Device.setEventTime(Int timerID, Int time) Sets the timer specified by *timerID* to match the time, in device clock cycles, given by *time*
-	def setEventTime(self, timerID, time):
+		actions = [0] * len(actionArg)
+		for n in range(0,len(actionArg),2):
+				actions[n] = self.actions.index(actionArg[n])
+				actions[n+1] = actionArg[n+1]
+
+		self.propCom.send( "event", [self.conditions.index(condition), condParam] + actions )
+
+	#function Device.setEventTimer(Int timerID, Int time) Sets the timer specified by *timerID* to match the time, in device clock cycles, given by *time*
+	def setEventTimer(self, timerID, time):
 		self.propCom.send( "timer", [timerID, time])
+	#function Device.eventTrigger(Int trigger) Activates an external trigger for OnTrigger events
+	def eventTrigger(self, trigger):
+		self.propCom.send( "trigger", trigger )
 	#function Device.resetEvents() Reset and remove all events from the event loop.
 	def resetEvents(self):
 		self.propCom.send("resetevents")
