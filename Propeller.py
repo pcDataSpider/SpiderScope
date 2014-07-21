@@ -22,11 +22,7 @@ ESC = "`"
 
 #keyTable = {0:"talk",1:"over",2:"bad",3:"version",4:"start",5:"stop",6:"set",7:"dir",8:"query",9:"info",10:"dig",11:"wav"} 
 keyTable = ["talk","over","bad","version","start","stop","set","dir","query","info","dig","wav","point","sync","avg", "timer", "event", "resetevents"]
-conditions = ["timerExpire", "always", "onChange", "onHigh", "onLow", "whileHigh", "whileLow"]
-actions = ["setTimer", "notify", "AIStart", "AIStop"]
 
-conditions = ["timerExpire", "always", "onChange", "onHigh", "onLow", "whileHigh", "whileLow"]
-actions = ["setTimer", "notify", "AIStart", "AIStop"]
 
 # -- Class that holds one integer point.
 class Data():
@@ -47,6 +43,10 @@ class Data():
 # The Device class is useful for dealing with Channels instead of raw communication packets.
 
 class Device():
+
+	actions = ["SetTimer", "Notify", "AIStart", "AIStop", "DigHigh", "DigLow"] 
+	conditions = ["TimerExpire", "Always", "OnChange", "OnHigh", "OnLow", "WhileHigh", "WhileLow"]
+
 	propCom = None
 	analogIn = dict()
 	analogOut = dict()
@@ -117,6 +117,16 @@ class Device():
 				self.propCom.send("query", idx)
 			else:
 				logger.log("Bad Channel Querry", chan, logger.WARNING)
+	# function Device.addEvent( String condition, Int condParam, String action, Int actionParam ) Add a new event, that executes *action* with specified parameters in *actionParam* when *condition* is met with the given parameters in *condParam*. *condition* and *action* should match entries in the device condition and action tables.
+	def addEvent(self, condition, condParam, action, actionParam):
+		self.propCom.send( "event", [self.conditions.index(condition), self.actions.index(action), condParam, actionParam])
+
+	#function Device.setEventTime(Int timerID, Int time) Sets the timer specified by *timerID* to match the time, in device clock cycles, given by *time*
+	def setEventTime(self, timerID, time):
+		self.propCom.send( "timer", [timerID, time])
+	#function Device.resetEvents() Reset and remove all events from the event loop.
+	def resetEvents(self):
+		self.propCom.send("resetevents")
 
 
 
