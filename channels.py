@@ -251,7 +251,7 @@ class Digitals(Channel):
 			self.setDir(dirs)
 			self.resetWidgets()
 		def digHook(propCom,  dVal, tStamp):
-			rFalseTime = propCom.realTime(tStamp, self.idx)
+			rTime = propCom.realTime(tStamp, self.idx)
 			with self.lock:
 				for obj in self.hooks.copy():
 						try:
