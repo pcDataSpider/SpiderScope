@@ -289,7 +289,7 @@ class MainFrame ( wx.Frame ):
 		self.channelSizer.Add(self.rightSizer, 1, wx.EXPAND)
 
 		#loc = wx.IconLocation(r'D:\Python27\python.exe', 0)
-		ico = wx.Icon('OFSI-Logo.ico', wx.BITMAP_TYPE_ICO )
+		ico = wx.Icon('Logo.ico', wx.BITMAP_TYPE_ICO )
 		self.SetIcon( ico )
 
 
