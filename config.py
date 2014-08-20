@@ -35,14 +35,18 @@ def load(section):
 	for (field,value) in config.items(section):
 		vals = value.split(",")
 		for i in xrange(0,len(vals)):
+			# value can be int, float, boolean, or string. test in that order, falling back to string if no other match.
 			v = vals[i]
 			try:
-				v = float(v)
+				v = int(v)
 			except ValueError:
-				if v.lower() == "true":
-					v = True
-				elif v.lower() == "false":
-					v = False
+				try:
+					v = float(v)
+				except ValueError:
+					if v.lower() == "true":
+						v = True
+					elif v.lower() == "false":
+						v = False
 			vals[i] = v
 		if len(vals)>1:
 			options[field] = vals

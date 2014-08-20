@@ -366,9 +366,9 @@ class RunForDialog ( wx.Dialog ):
 		timerSizer.AddSpacer( ( 0, 0), 1, wx.EXPAND, 0 )
 		
 		# create spin controls
-		self.hours = wx.SpinCtrl( self, wx.ID_ANY, str(Hrs), wx.DefaultPosition, wx.Size( 50,-1 ), wx.SP_ARROW_KEYS, 0, 999, 0 )
-		self.minutes = wx.SpinCtrl( self, wx.ID_ANY, str(Min), wx.DefaultPosition, wx.Size( 45,-1 ), wx.SP_ARROW_KEYS, 0, 59, 0 )
-		self.seconds = wx.SpinCtrl( self, wx.ID_ANY, str(Sec), wx.DefaultPosition, wx.Size( 45,-1 ), wx.SP_ARROW_KEYS, 0, 59, 0 )
+		self.hours = wx.SpinCtrl( self, wx.ID_ANY, str(Hrs), wx.DefaultPosition, wx.Size( 100,-1 ), wx.SP_ARROW_KEYS, 0, 999, 0 )
+		self.minutes = wx.SpinCtrl( self, wx.ID_ANY, str(Min), wx.DefaultPosition, wx.Size( 50,-1 ), wx.SP_ARROW_KEYS, 0, 59, 0 )
+		self.seconds = wx.SpinCtrl( self, wx.ID_ANY, str(Sec), wx.DefaultPosition, wx.Size( 50,-1 ), wx.SP_ARROW_KEYS, 0, 59, 0 )
 		
 		# create labels
 		self.hoursTxt = wx.StaticText( self, wx.ID_ANY, "hours", wx.DefaultPosition, wx.DefaultSize, 0 )

@@ -292,7 +292,7 @@ class NewGui(GUI3.MainFrame):
 			self.widgets[idx].timerText.SetLabel(timeFormat)
 			self.widgets[idx].timerText.Enable(True)
 
-			self.widgets[idx].progressBar.SetRange(PROGRESS_PRECISION)
+			self.widgets[idx].progressBar.SetRange(logger.options["progress_precision"])
 			self.widgets[idx].progressBar.SetValue(0)
 
 			def decTimer():
