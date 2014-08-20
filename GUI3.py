@@ -256,7 +256,7 @@ class TopPanel ( wx.Panel ):
 		self.channelSizer = wx.BoxSizer(wx.VERTICAL)
 
 		# stuff at the top of the GUI
-		topTxt = wx.StaticText( self, wx.ID_ANY, "Optical Fiber Systems", wx.DefaultPosition, wx.DefaultSize, 0 )
+		topTxt = wx.StaticText( self, wx.ID_ANY, "SpiderScope Measurment Tool", wx.DefaultPosition, wx.DefaultSize, 0 )
 	
 	
 		topSizer.Add( topTxt, 0, wx.ALL|wx.ALIGN_CENTER_HORIZONTAL, 5 )
