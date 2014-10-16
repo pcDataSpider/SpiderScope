@@ -499,6 +499,8 @@ def addTools(searchdir):
 					logger.log("Loaded Plugin", mod, logger.INFO)
 			except SyntaxError:
 				logger.log("Invalid syntax!", fullPath, logger.ERROR)
+			except Exception as e:
+				logger.log("could not load plugin: " + fullPath, e, logger.ERROR)
 	return items
 
 def importTools(paths):
@@ -516,8 +518,10 @@ def importTools(paths):
 	for path in paths:
 		try:
 			items.extend(  addTools(os.path.abspath(path)) )
-		except OSError:
-			logger.lod("Failed to load plugins", path, logger.WARNING)
+		#except OSError as e:
+		#	logger.log("Failed to load plugins", path, logger.WARNING)
+		except Exception as e:
+			logger.log("Failed to load plugins", e, logger.WARNING)
 	
 	baseDir = []
 	for i in items:

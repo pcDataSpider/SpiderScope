@@ -1,5 +1,5 @@
 [DEFAULT]
-plugin_dir = ../testingPlug
+plugin_dir = ../plugins,../laserstation
 progress_precision = 25
 
 [logging]

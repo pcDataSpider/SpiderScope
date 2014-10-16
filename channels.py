@@ -132,7 +132,7 @@ class Channel():
 			self.hooks.remove(obj)
 		except KeyError as E:
 			logger.log("No function registered in channel " + str(self.idx),  str(obj), logger.WARNING)
-			raise
+			#raise
 
 	#function Channel.start() Start this channel. Can have different meaning for different channels.
 	def start(self):
