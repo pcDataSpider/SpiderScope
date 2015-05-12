@@ -1,4 +1,5 @@
 
+import traceback
 import sys
 import os
 import imp
@@ -105,6 +106,7 @@ class NewGui(GUI3.MainFrame):
 					item.run_tool(self, device)
 				except Exception as e:
 					logger.log("Unhandled Exception in " + item.title, e, logger.ERROR)
+					logger.log(":", traceback.format_exc())
 			newitem = wx.MenuItem( parent, wx.ID_ANY, item.title, item.description, wx.ITEM_NORMAL )
 			self.Bind( wx.EVT_MENU, handler, id=newitem.GetId())
 
